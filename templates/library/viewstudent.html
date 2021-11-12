@@ -86,7 +86,7 @@ border-radius: 5px;
       <td>{{s.get_name}}</td>
       <td>{{s.enrollment}}</td>
       <td>{{s.branch}}</td>
-      <td><a HREF="testpage">view</a></td>
+      <td><a href="{% url 'userbooklog' s.user.username %}">view</a></td>
     </tr>
 
   {% endfor %}

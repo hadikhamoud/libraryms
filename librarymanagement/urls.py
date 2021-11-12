@@ -44,8 +44,15 @@ urlpatterns = [
     path('viewissuedbook', views.viewissuedbook_view),
     path('viewstudent', views.viewstudent_view),
     path('viewissuedbookbystudent', views.viewissuedbookbystudent),
+    path('viewbooks', views.viewissuedbookbystudent),
+
+    path('BooksAvailable', views.booksAvailable_view),
+   # path('deleteRecords',views.deleteRecords),
+
 
     path('aboutus', views.aboutus_view),
     path('contactus', views.contactus_view),
+    path('userbooklog/<str:username>', views.userbooklog, name='userbooklog'),
+    path('modifybook/<str:isbn>', views.modifybook, name='modifybook')
 
 ]
