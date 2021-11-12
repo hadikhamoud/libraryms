@@ -4,8 +4,9 @@ from datetime import datetime,timedelta
 
 
 
+
 class StudentExtra(models.Model):
-    user=models.OneToOneField(User,on_delete=models.CASCADE)
+    user=models.ForeignKey(User,on_delete=models.CASCADE)
     enrollment = models.CharField(max_length=40)
     branch = models.CharField(max_length=40)
     #used in issue book
@@ -17,6 +18,30 @@ class StudentExtra(models.Model):
     @property
     def getuserid(self):
         return self.user.id
+def get_expiry():
+    return datetime.today() + timedelta(days=30)
+
+class Borrower(models.Model):
+    student=models.ForeignKey('StudentExtra', on_delete=models.CASCADE,null=True)
+    book = models.ForeignKey('Book', on_delete=models.CASCADE,null=True)
+    issue_date = models.DateTimeField(auto_now=True,null=True)
+    return_date = models.DateTimeField(default=get_expiry())
+    status = models.CharField(max_length=40,null=True)
+
+    class Meta:
+        unique_together=["student","book"]
+
+
+    def __str__(self):
+        return str(self.student.user)+" borrowed "+str(self.book)
+
+    def dayMonthYearIssue(self):
+        return self.issue_date.strftime("%d/%m/%Y")
+    def dayMonthYearReturn(self):
+        return self.return_date.strftime("%d/%m/%Y")
+
+
+
 
 
 class Book(models.Model):
@@ -35,8 +60,7 @@ class Book(models.Model):
         return str(self.name)+"["+str(self.isbn)+']'
 
 
-def get_expiry():
-    return datetime.today() + timedelta(days=15)
+
 class IssuedBook(models.Model):
     #moved this in forms.py
     #enrollment=[(student.enrollment,str(student.get_name)+' ['+str(student.enrollment)+']') for student in StudentExtra.objects.all()]

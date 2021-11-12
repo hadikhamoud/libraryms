@@ -78,17 +78,22 @@ border-radius: 5px;
 </tr>
 </tfoot>
 <tbody>
+<form method ="POST">
+
   {% for book in books %}
-    <tr>
+  <tr>
+      {% csrf_token %}
       <td>{{book.name}}</td>
       <td>{{book.isbn}}</td>
       <td>{{book.author}}</td>
       <td>{{book.category}}</td>
-      <td><a href="{% url 'modifybook' book.isbn %}"</a>Modify Book</td>
-
-    </tr>
+      <td><input type="checkbox" name="choices" value={{book.isbn}}  class="Book"></td>
+       
+  </tr>
   {% endfor %}
 </tbody>
+<input type="submit" value = "Request Books"/>
+      </form>
 </table>
 {%else%}
 <h1>Have 0 book</h1>

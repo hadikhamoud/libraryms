@@ -107,7 +107,7 @@ border-radius: 5px;
     <tr>
     <th>Issue Date</th>
     <th>Expiry Date</th>
-    <th>Fine</th>
+    <th>Request Extension</th>
     </tr>
     </thead>
     <tfoot>
@@ -118,16 +118,13 @@ border-radius: 5px;
     </tr>
     </tfoot>
     <tbody>
+
       {% for t in li2 %}
 <tr>
   <td>  {{t.0}}</td>
   <td>  {{t.1}}</td>
-  <td>  {{t.2}}</td>
+  <td>Request Renewal</td>
 </tr>
-
-
-
-
       {% endfor %}
     </tbody>
     </table>

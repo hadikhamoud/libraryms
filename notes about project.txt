@@ -1,0 +1,7 @@
+
+
+- to manage the database using shell:
+
+1 - python manage.py shell
+2 - from library.models import *   (or import any model you would like)
+3 - use django commands which are mapped to sql lines
