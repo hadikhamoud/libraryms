@@ -5,10 +5,13 @@ from django.http import HttpResponseRedirect
 from django.contrib.auth.models import Group
 from django.contrib import auth
 from django.contrib.auth.decorators import login_required,user_passes_test
-from datetime import datetime,timedelta,date
+from datetime import datetime, timedelta, date
+
 from django.core.mail import send_mail
 from librarymanagement.settings import EMAIL_HOST_USER
-from datetime import datetime
+from datetime import datetime, timezone
+from django.contrib.auth import get_user_model
+from django_email_verification import send_email
 
 
 def home_view(request):
@@ -67,8 +70,11 @@ def studentsignup_view(request):
             f2=form2.save(commit=False)
             f2.user=user
             user2=f2.save()
+            print(user)
             my_student_group = Group.objects.get_or_create(name='STUDENT')
+            print(my_student_group[0])
             my_student_group[0].user_set.add(user)
+            print(my_student_group[0])
 
         return HttpResponseRedirect('studentlogin')
     return render(request,'library/studentsignup.html',context=mydict)
@@ -83,7 +89,20 @@ def afterlogin_view(request):
     if is_admin(request.user):
         return render(request,'library/adminafterlogin.html')
     else:
-        return render(request,'library/studentafterlogin.html')
+        BooksComingUp = []
+        BorrowedBooks = models.Borrower.objects.filter(student__user__id=request.user.id).filter(status="Issued")
+        print(BorrowedBooks)
+        for ib in BorrowedBooks:
+            return_date_days = ib.return_date.date()
+            d = date.today()-return_date_days
+            d=d.days
+            print(d)
+            if int(d)<0:
+                BorrowedBooks = BorrowedBooks.exclude(id=ib.id)
+        if BorrowedBooks.exists():
+            BooksComingUp.append(True)
+        print(BorrowedBooks)
+        return render(request,'library/studentafterlogin.html',{"ComingUp": BooksComingUp})
 
 
 @login_required(login_url='adminlogin')
@@ -164,10 +183,16 @@ def issuebook_view(request):
         #now this form have data from html
         form=forms.IssuedBookForm(request.POST)
         if form.is_valid():
-            obj=models.IssuedBook()
-            obj.enrollment=request.POST.get('enrollment2')
-            obj.isbn=request.POST.get('isbn2')
+            obj=models.Borrower()
+            student = form.cleaned_data['enrollment2']
+            book = form.cleaned_data['isbn2']
+            #student = models.StudentExtra.objects.get(pk=form.enrollment2)
+            #book = models.Book.objects.get(isbn = 'isbn2')
+            obj.student=student
+            obj.book=book
+            obj.status="Issued"
             obj.save()
+            print(obj.status,obj.student,obj.book)
             return render(request,'library/bookissued.html')
     return render(request,'library/issuebook.html',{'form':form})
 
@@ -240,6 +265,36 @@ def viewstudent_view(request):
     students=models.StudentExtra.objects.all()
     return render(request,'library/viewstudent.html',{'students':students})
 
+@login_required(login_url='studentlogin')
+def ComingUp(request):
+    student=models.StudentExtra.objects.filter(user_id=request.user.id)
+    issuedbook=models.Borrower.objects.filter(student=student[0]).filter(status="Issued")
+    li1=[]
+    li2=[]
+    for ib in issuedbook:
+        print(ib)
+        books=models.Borrower.objects.filter(student=ib.student,book=ib.book)
+        return_date_days = books[0].return_date.date()
+        d = date.today()-return_date_days
+        d=d.days
+        if int(d)<0:
+             continue
+        if len(books)>0:
+            t=(books[0].student.user.username,books[0].student.enrollment,books[0].student.branch,books[0].book.name,books[0].book.author)
+            li1.append(t)
+            issdate=str(books[0].issue_date.day)+'-'+str(books[0].issue_date.month)+'-'+str(books[0].issue_date.year)
+            expdate=str(books[0].return_date.day)+'-'+str(books[0].return_date.month)+'-'+str(books[0].return_date.year)
+            #expdate=0
+        #fine calculation
+            print(books[0].return_date)
+            fine = CalculateFine(books[0].return_date.date())
+            fine = "$" + str(fine)
+            borrowerID = books[0].id
+            t=(issdate,expdate,fine,borrowerID)
+            li2.append(t)
+
+    return render(request,'library/viewissuedbookbystudent.html',{'li1':li1,'li2':li2})
+
 
 @login_required(login_url='studentlogin')
 def viewissuedbookbystudent(request):
@@ -255,24 +310,60 @@ def viewissuedbookbystudent(request):
         if len(books)>0:
             t=(books[0].student.user.username,books[0].student.enrollment,books[0].student.branch,books[0].book.name,books[0].book.author)
             li1.append(t)
-            date = books[0].issue_date
-            print(date)
             issdate=str(books[0].issue_date.day)+'-'+str(books[0].issue_date.month)+'-'+str(books[0].issue_date.year)
             expdate=str(books[0].return_date.day)+'-'+str(books[0].return_date.month)+'-'+str(books[0].return_date.year)
             #expdate=0
         #fine calculation
-
-      #  days=(date.today()-ib.issuedate)
-       # print(date.today())
-#        d=days.days
- #       fine=0
-  #      if d>15:
-    #        day=d-15
-            fine=0
-            t=(issdate,expdate,fine)
+            print(books[0].return_date)
+            fine = CalculateFine(books[0].return_date.date())
+            fine = "$" + str(fine)
+            borrowerID = books[0].id
+            t=(issdate,expdate,fine,borrowerID)
             li2.append(t)
 
     return render(request,'library/viewissuedbookbystudent.html',{'li1':li1,'li2':li2})
+
+def CalculateFine(returndate):
+    days=date.today() - returndate
+    d=days
+
+    print(type(d))
+    fine=0
+    d=d.days
+    print(type(d))
+    if int(d)>0:
+        fine=d*1
+    return fine
+
+@login_required(login_url='adminlogin')
+@user_passes_test(is_admin)
+def CloseToDeadline(request):
+    Borrowers = models.Borrower.objects.filter(status="Issued").order_by('return_date')
+
+    li1=[]
+    li2=[]
+    for ib in Borrowers:
+            print(ib)
+            books=models.Borrower.objects.filter(student=ib.student,book=ib.book)
+            print(books)
+
+            if len(books)>0:
+                t=(books[0].student.user.username,books[0].student.enrollment,books[0].student.branch,books[0].book.name,books[0].book.author)
+                li1.append(t)
+                issdate=str(books[0].issue_date.day)+'-'+str(books[0].issue_date.month)+'-'+str(books[0].issue_date.year)
+                expdate=str(books[0].return_date.day)+'-'+str(books[0].return_date.month)+'-'+str(books[0].return_date.year)
+                #expdate=0
+            #fine calculation
+                print(books[0].return_date)
+                fine = CalculateFine(books[0].return_date.date())
+                fine = "$" + str(fine)
+                borrowerID = books[0].id
+                t=(issdate,expdate,fine,borrowerID)
+                li2.append(t)
+
+    return render(request, 'library/CloseToDeadline.html', {'li1':li1,'li2':li2})
+
+
 
 @login_required(login_url='adminlogin')
 @user_passes_test(is_admin)
@@ -289,23 +380,40 @@ def userbooklog(request,username):
         if len(books)>0:
             t=(books[0].student.user.username,books[0].student.enrollment,books[0].student.branch,books[0].book.name,books[0].book.author)
             li1.append(t)
-            date = books[0].issue_date
-            print(date)
             issdate=str(books[0].issue_date.day)+'-'+str(books[0].issue_date.month)+'-'+str(books[0].issue_date.year)
             expdate=str(books[0].return_date.day)+'-'+str(books[0].return_date.month)+'-'+str(books[0].return_date.year)
-            #expdate=0
-        #fine calculation
 
-      #  days=(date.today()-ib.issuedate)
-       # print(date.today())
-#        d=days.days
- #       fine=0
-  #      if d>15:
-    #        day=d-15
-            fine=0
-            t=(issdate,expdate,fine)
+
+            fine = CalculateFine(books[0].return_date.date())
+            fine = "$" + str(fine)
+            BorrowerID = books[0].id
+            t=(issdate,expdate,fine,BorrowerID)
             li2.append(t)
     return render(request, 'library/userbooklog.html', {'li1':li1,'li2':li2})
+
+@login_required(login_url='studentlogin')
+def RenewBook(request,borrowerID):
+    print(borrowerID,type(borrowerID))
+    response =[]
+    BorrowedBook = models.Borrower.objects.get(id=borrowerID)
+    if request.method=='POST':
+        #dumb way to distinguish navbar
+        #(to be changed if time allows)
+        navbar=[]
+        if is_admin(request.user):
+            navbar.append(True)
+
+        if not BorrowedBook.Renewed:
+            BorrowedBook.return_date += timedelta(days = 30)
+            BorrowedBook.Renewed = True
+            BorrowedBook.save()
+            response.append(True)
+        return render(request,'library/renewed.html',{'response': response,'navbar': navbar})
+    return render(request,'library/RenewBook.html',{'li': BorrowedBook})
+
+
+
+
 
 
 @login_required(login_url='adminlogin')

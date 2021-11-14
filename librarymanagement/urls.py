@@ -18,13 +18,14 @@ from django.conf.urls import include
 from django.urls import path
 from library import views
 from django.contrib.auth.views import LoginView,LogoutView
-
-
+from django_email_verification import urls as email_urls
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/',include('django.contrib.auth.urls') ),
     path('', views.home_view),
+     path('admin/', admin.site.urls),
+     path('email/', include(email_urls)),
 
     path('adminclick', views.adminclick_view),
     path('studentclick', views.studentclick_view),
@@ -32,6 +33,7 @@ urlpatterns = [
 
     path('adminsignup', views.adminsignup_view),
     path('studentsignup', views.studentsignup_view),
+
     path('adminlogin', LoginView.as_view(template_name='library/adminlogin.html')),
     path('studentlogin', LoginView.as_view(template_name='library/studentlogin.html')),
 
@@ -53,6 +55,10 @@ urlpatterns = [
     path('aboutus', views.aboutus_view),
     path('contactus', views.contactus_view),
     path('userbooklog/<str:username>', views.userbooklog, name='userbooklog'),
-    path('modifybook/<str:isbn>', views.modifybook, name='modifybook')
+    path('modifybook/<str:isbn>', views.modifybook, name='modifybook'),
+    path('RenewBook/<str:borrowerID>/', views.RenewBook, name='RenewBook'),
+    path('ComingUp', views.ComingUp, name='ComingUp'),
+    path('CloseToDeadline', views.CloseToDeadline, name='CloseToDeadline')
+
 
 ]
