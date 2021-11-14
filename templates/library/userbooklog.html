@@ -107,6 +107,8 @@ border-radius: 5px;
     <tr>
     <th>Issue Date</th>
     <th>Expiry Date</th>
+    <th>Fine</th>
+    <th>Renew</th>
 
     </tr>
     </thead>
@@ -123,6 +125,8 @@ border-radius: 5px;
 <tr>
   <td>  {{t.0}}</td>
   <td>  {{t.1}}</td>
+  <td>  {{t.2}}</td>
+  <td> <a href="{% url 'RenewBook' t.3 %}">Renew</a></td>
 </tr>
       {% endfor %}
     </tbody>

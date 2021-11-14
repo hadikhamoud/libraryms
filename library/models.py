@@ -1,12 +1,12 @@
 from django.db import models
 from django.contrib.auth.models import User
-from datetime import datetime,timedelta
+from datetime import datetime,timedelta,timezone
 
 
 
 
 class StudentExtra(models.Model):
-    user=models.ForeignKey(User,on_delete=models.CASCADE)
+    user=models.OneToOneField(User,on_delete=models.CASCADE)
     enrollment = models.CharField(max_length=40)
     branch = models.CharField(max_length=40)
     #used in issue book
@@ -19,7 +19,9 @@ class StudentExtra(models.Model):
     def getuserid(self):
         return self.user.id
 def get_expiry():
-    return datetime.today() + timedelta(days=30)
+    return datetime.today() - timedelta(days=60)
+
+# + timedelta(days=30)
 
 class Borrower(models.Model):
     student=models.ForeignKey('StudentExtra', on_delete=models.CASCADE,null=True)
@@ -27,6 +29,7 @@ class Borrower(models.Model):
     issue_date = models.DateTimeField(auto_now=True,null=True)
     return_date = models.DateTimeField(default=get_expiry())
     status = models.CharField(max_length=40,null=True)
+    Renewed = models.BooleanField(default=False)
 
     class Meta:
         unique_together=["student","book"]

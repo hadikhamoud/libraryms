@@ -2,6 +2,18 @@ from django import forms
 from django.contrib.auth.models import User
 from . import models
 
+def AvailableBooksOnly():
+    books=models.Book.objects.all()
+    print(books)
+    for ib in books:
+        Availability = models.Borrower.objects.filter(book=ib).filter(status="Issued")
+        if Availability.exists():
+            print(Availability)
+            books = books.exclude(isbn=ib.isbn)
+    print(books)
+    return books
+
+
 class ContactusForm(forms.Form):
     Name = forms.CharField(max_length=30)
     Email = forms.EmailField()
@@ -35,7 +47,9 @@ class BookForm(forms.ModelForm):
     class Meta:
         model=models.Book
         fields=['name','isbn','author','category']
+
 class IssuedBookForm(forms.Form):
     #to_field_name value will be stored when form is submitted.....__str__ method of book model will be shown there in html
-    isbn2=forms.ModelChoiceField(queryset=models.Book.objects.all(),empty_label="Name and isbn", to_field_name="isbn",label='Name and Isbn')
-    enrollment2=forms.ModelChoiceField(queryset=models.StudentExtra.objects.all(),empty_label="Name and enrollment",to_field_name='enrollment',label='Name and enrollment')
+    booksAvailable = AvailableBooksOnly()
+    isbn2=forms.ModelChoiceField(queryset=booksAvailable,empty_label="Name and isbn",label='Name and Isbn')
+    enrollment2=forms.ModelChoiceField(queryset=models.StudentExtra.objects.all(),empty_label="Name and enrollment",label='Name and enrollment')
