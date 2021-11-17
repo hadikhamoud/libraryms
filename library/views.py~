@@ -11,7 +11,7 @@ from django.core.mail import send_mail
 from librarymanagement.settings import EMAIL_HOST_USER
 from datetime import datetime, timezone
 from django.contrib.auth import get_user_model
-
+from django_email_verification import send_email
 
 
 def home_view(request):
