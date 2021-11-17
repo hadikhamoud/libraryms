@@ -11,7 +11,7 @@ from django.core.mail import send_mail
 from librarymanagement.settings import EMAIL_HOST_USER
 from datetime import datetime, timezone
 from django.contrib.auth import get_user_model
-from django_email_verification import send_email
+
 
 
 def home_view(request):
@@ -97,7 +97,7 @@ def afterlogin_view(request):
             d = date.today()-return_date_days
             d=d.days
             print(d)
-            if int(d)<0:
+            if int(d)<-1:
                 BorrowedBooks = BorrowedBooks.exclude(id=ib.id)
         if BorrowedBooks.exists():
             BooksComingUp.append(True)
@@ -277,7 +277,7 @@ def ComingUp(request):
         return_date_days = books[0].return_date.date()
         d = date.today()-return_date_days
         d=d.days
-        if int(d)<0:
+        if int(d)<-1:
              continue
         if len(books)>0:
             t=(books[0].student.user.username,books[0].student.enrollment,books[0].student.branch,books[0].book.name,books[0].book.author)
