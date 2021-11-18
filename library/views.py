@@ -171,7 +171,7 @@ def booksAvailable_view(request):
     #remove the book from the query
     for ib in books:
         #Borrower removes the book if the student has it already or has already requested it
-        Borrower = models.Borrower.objects.filter(book=ib).filter(student__user_id=request.user.id)
+        Borrower = models.Borrower.objects.filter(book=ib).filter(student__user_id=request.user.id).filter(status="Pending")
         #Availability removes the book if anyone else has it issued
         Availability = models.Borrower.objects.filter(book=ib).filter(status="Issued")
         print(Borrower)
@@ -294,17 +294,8 @@ def viewissuedbook_view(request):
         id_list = request.POST.getlist("choices")
         print(id_list)
         for ib in id_list:
-            #a /// delimiter is set because we need the username and the isbn of the book to work with it
-            #Note:on second thought, Borrower object id could be sent, better practice
-           ib=ib.split("///")
-           if ib[1]=='':
-            ib[1]=0
-            #set variables for username and id
-           username = ib[0]
-           isbn=int(ib[1])
-           print(isbn,username)
            #get the suitable borrower object
-           Selected=models.Borrower.objects.filter(student__user__username = username).filter(book__isbn=isbn)
+           Selected=models.Borrower.objects.filter(id = ib)
            if Selected.exists():
                #change the status to "Issued"
                print(Selected)
@@ -313,7 +304,7 @@ def viewissuedbook_view(request):
                Selected.save()
                #delete all the requests for this book from other users since he has gotten it
                #(could be modified if we add multiple copies)
-               models.Borrower.objects.filter(book__isbn=isbn).exclude(student__user__username = username).delete()
+               models.Borrower.objects.filter(book__isbn=Selected.book.isbn).exclude(student__user__username = Selected.student.user.username).delete()
                print(Selected.issue_date)
                print(Selected.status)
     return render(request,'library/viewissuedbook.html',{'li':li})
@@ -426,6 +417,21 @@ def CloseToDeadline(request):
                 borrowerID = ib.id
                 t=(issdate,expdate,fine,borrowerID)
                 li2.append(t)
+    if request.method =="POST":
+            id_list = request.POST.getlist("choices")
+            print(id_list)
+                #id list contains all the isbns of the books chosen
+            for ib in id_list:
+                    #iterate through isbns and create Borrower objects with status "pending"
+                  #set variables for username and id
+                 #get the suitable borrower object
+                Selected=models.Borrower.objects.filter(id=ib).filter(status="Issued")
+                if Selected.exists():
+                     #change the status to "Issued"
+                    print(Selected)
+                    Selected=Selected[0]
+                    Selected.status = "Returned"
+                    Selected.save()
 
     return render(request, 'library/CloseToDeadline.html', {'li1':li1,'li2':li2})
 
@@ -441,6 +447,9 @@ def userbooklog(request,username):
     li1=[]
     li2=[]
     #also same process as before in viewissuedbooksbystudent
+    if not issuedbook.exists():
+        return render(request, 'library/userbooklog.html', {'li1':li1,'li2':li2})
+
     for ib in issuedbook:
         print(ib)
         books=models.Borrower.objects.filter(student=ib.student,book=ib.book)
@@ -458,6 +467,23 @@ def userbooklog(request,username):
             BorrowerID = ib.id
             t=(issdate,expdate,fine,BorrowerID)
             li2.append(t)
+    if request.method =="POST":
+        id_list = request.POST.getlist("choices")
+        print(id_list)
+        #id list contains all the isbns of the books chosen
+        for ib in id_list:
+            #iterate through isbns and create Borrower objects with status "pending"
+          #set variables for username and id
+         #get the suitable borrower object
+            Selected=models.Borrower.objects.filter(id=ib).filter(status="Issued")
+            if Selected.exists():
+             #change the status to "Issued"
+                print(Selected)
+                Selected=Selected[0]
+                Selected.status = "Returned"
+                Selected.save()
+
+
     return render(request, 'library/userbooklog.html', {'li1':li1,'li2':li2})
 
 
@@ -559,11 +585,11 @@ def ifrequestedbefore(isbn,stid):
 #this duplicate handling system could be used everywhere
 def deleteDuplicateBorrowers():
     #order books by issue date in a query
-    BorrowerObjects = models.Borrower.objects.all().order_by('issue_date')
+    BorrowerObjects = models.Borrower.objects.filter(status="Pending").order_by('issue_date')
     #check all the books from bottom to top
     for rows in BorrowerObjects.reverse():
         #if we find a matching one when iterating from bottom to top
-        temp = models.Borrower.objects.filter(student=rows.student,book=rows.book)
+        temp = models.Borrower.objects.filter(student=rows.student,book=rows.book).filter(status="Pending")
         #remove the bottom one since we want the first instance of the Borrower object
         if temp.count()>1:
             rows.delete()

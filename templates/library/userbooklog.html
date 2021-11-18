@@ -109,6 +109,7 @@ border-radius: 5px;
     <th>Expiry Date</th>
     <th>Fine</th>
     <th>Renew</th>
+    <th>Book Returned</th>
 
     </tr>
     </thead>
@@ -120,17 +121,23 @@ border-radius: 5px;
     </tr>
     </tfoot>
     <tbody>
-
+      <form method = "POST">
       {% for t in li2 %}
 <tr>
+  {% csrf_token %}
   <td>  {{t.0}}</td>
   <td>  {{t.1}}</td>
   <td>  {{t.2}}</td>
   <td> <a href="{% url 'RenewBook' t.3 %}">Renew</a></td>
+  <td><input type="checkbox" name="choices" value={{t.3}} class=Borrower></td>
+
 </tr>
       {% endfor %}
     </tbody>
+
     </table>
+    <input type="submit" value="Return"/>
+  </form>
     {%else%}
     <h1> No book Issued to you man</h1>
     {%endif%}
