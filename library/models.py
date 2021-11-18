@@ -19,7 +19,7 @@ class StudentExtra(models.Model):
     def getuserid(self):
         return self.user.id
 def get_expiry():
-    return datetime.today() - timedelta(days=1)
+    return datetime.today() + timedelta(days=30)
 
 # + timedelta(days=30)
 
@@ -31,8 +31,6 @@ class Borrower(models.Model):
     status = models.CharField(max_length=40,null=True)
     Renewed = models.BooleanField(default=False)
 
-    class Meta:
-        unique_together=["student","book"]
 
 
     def __str__(self):
