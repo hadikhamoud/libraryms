@@ -6,11 +6,17 @@ from django.contrib.auth.models import Group
 from django.contrib import auth
 from django.contrib.auth.decorators import login_required,user_passes_test
 from datetime import datetime, timedelta, date
-
 from django.core.mail import send_mail
 from librarymanagement.settings import EMAIL_HOST_USER
 from datetime import datetime, timezone
 from django.contrib.auth import get_user_model
+from django.core.mail import EmailMessage
+from django.utils.encoding import force_bytes, force_text, DjangoUnicodeDecodeError
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.contrib.sites.shortcuts import get_current_site
+from django.urls import reverse
+from .utils import token_generator
+from django.shortcuts import redirect
 
 
 
@@ -32,7 +38,8 @@ def adminclick_view(request):
     return render(request,'library/adminclick.html')
 
 
-
+#creates Admin account, to be deleted (script to be written for adding
+#admins directly to db)
 def adminsignup_view(request):
     form=forms.AdminSigupForm()
     if request.method=='POST':
@@ -42,7 +49,7 @@ def adminsignup_view(request):
             user.set_password(user.password)
             user.save()
 
-
+            #groups to distinguish between admins and Student
             my_admin_group = Group.objects.get_or_create(name='ADMIN')
             my_admin_group[0].user_set.add(user)
 
@@ -50,13 +57,10 @@ def adminsignup_view(request):
     return render(request,'library/adminsignup.html',{'form':form})
 
 
-def ifrequestedbefore(isbn,stid):
-    Borrower = models.Borrower.objects.filter(book__isbn=isbn).filter(student__user__username=stid)
-    if Borrower.exists():
-        return True
-    return False
 
+#creates student account
 def studentsignup_view(request):
+    #form1 for user and form2 to add enrollment and branch
     form1=forms.StudentUserForm()
     form2=forms.StudentExtraForm()
     mydict={'form1':form1,'form2':form2}
@@ -66,39 +70,71 @@ def studentsignup_view(request):
         if form1.is_valid() and form2.is_valid():
             user=form1.save()
             user.set_password(user.password)
+            #deactivate account until verified by user
+            user.is_active=False
             user.save()
             f2=form2.save(commit=False)
             f2.user=user
             user2=f2.save()
-            print(user)
+            #add to 'student group'
             my_student_group = Group.objects.get_or_create(name='STUDENT')
-            print(my_student_group[0])
             my_student_group[0].user_set.add(user)
-            print(my_student_group[0])
+            #Process Of Sending the verification email(linked to VerificationEmail.views down):
+
+
+            #security id
+            uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+            #domain to be displayed on the verification link
+            domain = get_current_site(request).domain
+            #create link containing the uid and a security token
+            #this command is linked to a specific path in urls.py
+            link = reverse('activate',kwargs={'uidb64':uidb64,'token':token_generator.make_token(user)})
+            #final email to be sent
+            activate_url = "http://"+domain+link
+            #email content
+            email_subject = 'Activate your account'
+            email_body = 'Hi '+user.first_name+"\nPlease use this link to verify your account\n"+activate_url
+            #use EmailMessage class to construct email object
+            email = EmailMessage(
+            email_subject,
+            email_body,
+            'hadikhamoud@gmail.com',
+            [user.email]
+            )
+            #use EmailMessage built in method send to send email
+            email.send(fail_silently=False)
 
         return HttpResponseRedirect('studentlogin')
     return render(request,'library/studentsignup.html',context=mydict)
 
 
 
-
+#checks if user is admin or not by searching for his object in the ADMIN group
 def is_admin(user):
     return user.groups.filter(name='ADMIN').exists()
 
 def afterlogin_view(request):
+    #if admin show admin after login
     if is_admin(request.user):
         return render(request,'library/adminafterlogin.html')
+    #else show student after log in
     else:
+        #reminder function for books with one day left or no days:
         BooksComingUp = []
+        #query to check the status of all the books that are issued by student
         BorrowedBooks = models.Borrower.objects.filter(student__user__id=request.user.id).filter(status="Issued")
         print(BorrowedBooks)
         for ib in BorrowedBooks:
+            #iterate through books and check the return date and match it with today
             return_date_days = ib.return_date.date()
             d = date.today()-return_date_days
             d=d.days
             print(d)
+            #if there is more than one day left, then remove from query since we don't need it
             if int(d)<-1:
                 BorrowedBooks = BorrowedBooks.exclude(id=ib.id)
+            #if some books remain in the query, then there are some books close to expiry
+            #therefore, send a True flag to html frontend to show reminder link on mainpage
         if BorrowedBooks.exists():
             BooksComingUp.append(True)
         print(BorrowedBooks)
@@ -121,43 +157,57 @@ def addbook_view(request):
 @login_required(login_url='adminlogin')
 @user_passes_test(is_admin)
 def viewbook_view(request):
+    #query that shows all books for admin
     books=models.Book.objects.all()
     return render(request,'library/viewbook.html',{'books':books})
 
+
+#(could be enhanced)
 @login_required(login_url='studentlogin')
 def booksAvailable_view(request):
+    #view to show the available books for student, first query all books
     books=models.Book.objects.all()
+    #iterate through books and if you find a book that has been "Issued" by another student
+    #remove the book from the query
     for ib in books:
+        #Borrower removes the book if the student has it already or has already requested it
         Borrower = models.Borrower.objects.filter(book=ib).filter(student__user_id=request.user.id)
+        #Availability removes the book if anyone else has it issued
         Availability = models.Borrower.objects.filter(book=ib).filter(status="Issued")
         print(Borrower)
+        #exlude both from the main query
         if Borrower.exists():
             print(True)
             books = books.exclude(isbn=ib.isbn)
         if Availability.exists():
             books = books.exclude(isbn=ib.isbn)
+    #done with the first part, now to let the student request the books
 
-
+    #get all the checkboxes that the student has submitted into id_list
     if request.method =="POST":
         id_list = request.POST.getlist("choices")
         print(id_list)
-
+        #id list contains all the isbns of the books chosen
         for ib in id_list:
+            #iterate through isbns and create Borrower objects with status "pending"
             obj = models.Borrower()
             SelectedBook=models.Book.objects.filter(isbn=ib)
             if SelectedBook.exists():
+                #assign book of Borrower object
                 obj.book=SelectedBook[0]
 
             tempstudent=models.StudentExtra.objects.filter(user_id=request.user.id)
             if tempstudent.exists():
+                #assign student of Borrower object
                 obj.student=tempstudent[0]
-
+            #status "pending" means that the book has been requested and not yet approved
             obj.status="Pending"
             obj.save()
             print(obj.status)
+            #exlude the book that has been ordered now
             books = books.exclude(id=obj.book.id)
 
-
+#return to html the query of books
         return HttpResponseRedirect('BooksAvailable')
     return render(request,'library/BooksAvailable.html',{'books':books})
 
@@ -177,6 +227,8 @@ def issuebook_view(request):
             return render(request,'library/bookissued.html')
     return render(request,'library/issuebook.html',{'form':form})
 '''
+
+#to be fixed
 def issuebook_view(request):
     form=forms.IssuedBookForm()
     if request.method=='POST':
@@ -226,76 +278,98 @@ def viewissuedbook_view(request):
     return render(request,'library/viewissuedbook.html',{'li':li})
 
 '''
-def deleteDuplicateBorrowers():
-    BorrowerObjects = models.Borrower.objects.all().order_by('issue_date')
-    for rows in BorrowerObjects.reverse():
-        temp = models.Borrower.objects.filter(student=rows.student,book=rows.book)
-        if temp.count()>1:
-            rows.delete()
 
+
+#used to view the book requests by student on the admin side
+#could be enhanced
 @login_required(login_url='adminlogin')
 @user_passes_test(is_admin)
 def viewissuedbook_view(request):
+    #deletes all the duplicate requests
     deleteDuplicateBorrowers()
+    #checkss all the "pending" requests
     li=models.Borrower.objects.filter(status="Pending").distinct()
     if request.method =="POST":
+        #gets the choices from frontend in the form of a list from input checkboxes
         id_list = request.POST.getlist("choices")
         print(id_list)
         for ib in id_list:
+            #a /// delimiter is set because we need the username and the isbn of the book to work with it
+            #Note:on second thought, Borrower object id could be sent, better practice
            ib=ib.split("///")
            if ib[1]=='':
             ib[1]=0
+            #set variables for username and id
            username = ib[0]
            isbn=int(ib[1])
            print(isbn,username)
+           #get the suitable borrower object
            Selected=models.Borrower.objects.filter(student__user__username = username).filter(book__isbn=isbn)
            if Selected.exists():
+               #change the status to "Issued"
                print(Selected)
                Selected=Selected[0]
                Selected.status = "Issued"
                Selected.save()
+               #delete all the requests for this book from other users since he has gotten it
+               #(could be modified if we add multiple copies)
                models.Borrower.objects.filter(book__isbn=isbn).exclude(student__user__username = username).delete()
                print(Selected.issue_date)
                print(Selected.status)
     return render(request,'library/viewissuedbook.html',{'li':li})
 
+#views all the student
+
 @login_required(login_url='adminlogin')
 @user_passes_test(is_admin)
 def viewstudent_view(request):
+    #query all the students and return
     students=models.StudentExtra.objects.all()
     return render(request,'library/viewstudent.html',{'students':students})
 
+#check all the books that are coming up
+#could be enhanced (books could be replaced by ib)
 @login_required(login_url='studentlogin')
 def ComingUp(request):
+    #query student
     student=models.StudentExtra.objects.filter(user_id=request.user.id)
+    #query all his current books (borrower objects that are issued)
     issuedbook=models.Borrower.objects.filter(student=student[0]).filter(status="Issued")
+    #prepare two lists to send to frontend
     li1=[]
     li2=[]
     for ib in issuedbook:
+        #for each of his current books:
+        #get the Borrower object
         print(ib)
         books=models.Borrower.objects.filter(student=ib.student,book=ib.book)
-        return_date_days = books[0].return_date.date()
+        #check the return date
+        return_date_days = ib.return_date.date()
         d = date.today()-return_date_days
         d=d.days
+        #if it is not coming up in 1 day or already expired, then forget it
         if int(d)<-1:
              continue
         if len(books)>0:
-            t=(books[0].student.user.username,books[0].student.enrollment,books[0].student.branch,books[0].book.name,books[0].book.author)
+            #prepare to send info to frontend
+            t=(ib.student.user.username,ib.student.enrollment,ib.student.branch,ib.book.name,ib.book.author)
             li1.append(t)
-            issdate=str(books[0].issue_date.day)+'-'+str(books[0].issue_date.month)+'-'+str(books[0].issue_date.year)
-            expdate=str(books[0].return_date.day)+'-'+str(books[0].return_date.month)+'-'+str(books[0].return_date.year)
+            issdate=str(ib.issue_date.day)+'-'+str(ib.issue_date.month)+'-'+str(ib.issue_date.year)
+            expdate=str(ib.return_date.day)+'-'+str(ib.return_date.month)+'-'+str(ib.return_date.year)
             #expdate=0
         #fine calculation
-            print(books[0].return_date)
-            fine = CalculateFine(books[0].return_date.date())
+            print(ib.return_date)
+            fine = CalculateFine(ib.return_date.date())
             fine = "$" + str(fine)
-            borrowerID = books[0].id
+            borrowerID = ib.id
             t=(issdate,expdate,fine,borrowerID)
             li2.append(t)
 
     return render(request,'library/viewissuedbookbystudent.html',{'li1':li1,'li2':li2})
 
 
+#view all the issued books for the student
+#same process as before but without the 1 day left or less condition
 @login_required(login_url='studentlogin')
 def viewissuedbookbystudent(request):
     student=models.StudentExtra.objects.filter(user_id=request.user.id)
@@ -308,38 +382,30 @@ def viewissuedbookbystudent(request):
         print(books)
 
         if len(books)>0:
-            t=(books[0].student.user.username,books[0].student.enrollment,books[0].student.branch,books[0].book.name,books[0].book.author)
+            t=(ib.student.user.username,ib.student.enrollment,ib.student.branch,ib.book.name,ib.book.author)
             li1.append(t)
-            issdate=str(books[0].issue_date.day)+'-'+str(books[0].issue_date.month)+'-'+str(books[0].issue_date.year)
-            expdate=str(books[0].return_date.day)+'-'+str(books[0].return_date.month)+'-'+str(books[0].return_date.year)
+            issdate=str(ib.issue_date.day)+'-'+str(ib.issue_date.month)+'-'+str(ib.issue_date.year)
+            expdate=str(ib.return_date.day)+'-'+str(ib.return_date.month)+'-'+str(ib.return_date.year)
             #expdate=0
         #fine calculation
-            print(books[0].return_date)
-            fine = CalculateFine(books[0].return_date.date())
+            print(ib.return_date)
+            fine = CalculateFine(ib.return_date.date())
             fine = "$" + str(fine)
-            borrowerID = books[0].id
+            borrowerID = ib.id
             t=(issdate,expdate,fine,borrowerID)
             li2.append(t)
 
     return render(request,'library/viewissuedbookbystudent.html',{'li1':li1,'li2':li2})
 
-def CalculateFine(returndate):
-    days=date.today() - returndate
-    d=days
 
-    print(type(d))
-    fine=0
-    d=d.days
-    print(type(d))
-    if int(d)>0:
-        fine=d*1
-    return fine
 
+#gives admin a list of all the users that have books close to deadline
 @login_required(login_url='adminlogin')
 @user_passes_test(is_admin)
 def CloseToDeadline(request):
+    #querys  all the issued books that are close to deadline
     Borrowers = models.Borrower.objects.filter(status="Issued").order_by('return_date')
-
+    #same process as viewissuedbooksbystudent and ComingUp
     li1=[]
     li2=[]
     for ib in Borrowers:
@@ -348,53 +414,60 @@ def CloseToDeadline(request):
             print(books)
 
             if len(books)>0:
-                t=(books[0].student.user.username,books[0].student.enrollment,books[0].student.branch,books[0].book.name,books[0].book.author)
+                t=(ib.student.user.username,ib.student.enrollment,ib.student.branch,ib.book.name,ib.book.author)
                 li1.append(t)
-                issdate=str(books[0].issue_date.day)+'-'+str(books[0].issue_date.month)+'-'+str(books[0].issue_date.year)
-                expdate=str(books[0].return_date.day)+'-'+str(books[0].return_date.month)+'-'+str(books[0].return_date.year)
+                issdate=str(ib.issue_date.day)+'-'+str(ib.issue_date.month)+'-'+str(ib.issue_date.year)
+                expdate=str(ib.return_date.day)+'-'+str(ib.return_date.month)+'-'+str(ib.return_date.year)
                 #expdate=0
             #fine calculation
-                print(books[0].return_date)
-                fine = CalculateFine(books[0].return_date.date())
+                print(ib.return_date)
+                fine = CalculateFine(ib.return_date.date())
                 fine = "$" + str(fine)
-                borrowerID = books[0].id
+                borrowerID = ib.id
                 t=(issdate,expdate,fine,borrowerID)
                 li2.append(t)
 
     return render(request, 'library/CloseToDeadline.html', {'li1':li1,'li2':li2})
 
 
-
+#view the book log of every student
 @login_required(login_url='adminlogin')
 @user_passes_test(is_admin)
 def userbooklog(request,username):
+    #take from the previous session page the user name of the user
     student=models.StudentExtra.objects.filter(user__username=username)
+    #get all his issued books
     issuedbook=models.Borrower.objects.filter(student=student[0]).filter(status="Issued")
     li1=[]
     li2=[]
+    #also same process as before in viewissuedbooksbystudent
     for ib in issuedbook:
         print(ib)
         books=models.Borrower.objects.filter(student=ib.student,book=ib.book)
         print(books)
 
         if len(books)>0:
-            t=(books[0].student.user.username,books[0].student.enrollment,books[0].student.branch,books[0].book.name,books[0].book.author)
+            t=(ib.student.user.username,ib.student.enrollment,ib.student.branch,ib.book.name,ib.book.author)
             li1.append(t)
-            issdate=str(books[0].issue_date.day)+'-'+str(books[0].issue_date.month)+'-'+str(books[0].issue_date.year)
-            expdate=str(books[0].return_date.day)+'-'+str(books[0].return_date.month)+'-'+str(books[0].return_date.year)
+            issdate=str(ib.issue_date.day)+'-'+str(ib.issue_date.month)+'-'+str(ib.issue_date.year)
+            expdate=str(ib.return_date.day)+'-'+str(ib.return_date.month)+'-'+str(ib.return_date.year)
 
 
-            fine = CalculateFine(books[0].return_date.date())
+            fine = CalculateFine(ib.return_date.date())
             fine = "$" + str(fine)
-            BorrowerID = books[0].id
+            BorrowerID = ib.id
             t=(issdate,expdate,fine,BorrowerID)
             li2.append(t)
     return render(request, 'library/userbooklog.html', {'li1':li1,'li2':li2})
 
+
+#student can renew books
 @login_required(login_url='studentlogin')
 def RenewBook(request,borrowerID):
+    #borrowerID is sent with each Borrower object in the
     print(borrowerID,type(borrowerID))
     response =[]
+    #get the borrower object
     BorrowedBook = models.Borrower.objects.get(id=borrowerID)
     if request.method=='POST':
         #dumb way to distinguish navbar
@@ -404,10 +477,13 @@ def RenewBook(request,borrowerID):
             navbar.append(True)
 
         if not BorrowedBook.Renewed:
+            #renew the book if not renewed before and send True flag to alert
+            #front end that the book has been renewed
             BorrowedBook.return_date += timedelta(days = 30)
             BorrowedBook.Renewed = True
             BorrowedBook.save()
             response.append(True)
+        #else if response is empty, tell frontend that the book has already been renewed
         return render(request,'library/renewed.html',{'response': response,'navbar': navbar})
     return render(request,'library/RenewBook.html',{'li': BorrowedBook})
 
@@ -415,27 +491,35 @@ def RenewBook(request,borrowerID):
 
 
 
-
+#modify book information
 @login_required(login_url='adminlogin')
 @user_passes_test(is_admin)
 def modifybook(request,isbn):
+    #get isbn from previous page in same session
     Book = models.Book.objects.filter(isbn=isbn)
+    #fill the form initially with the old information
     form=forms.BookForm(initial={"name":Book[0].name,"isbn":Book[0].isbn,"author":Book[0].author,"category":Book[0].category})
     if request.method=='POST':
         #now this form have data from html
         form=forms.BookForm(request.POST)
         print(form)
         if form.is_valid():
+            #modify information and send form
             tempBook = form.save()
+            #update book object with new infromation
             Book.update(name=tempBook.name,isbn=tempBook.isbn,author=tempBook.author,category=tempBook.category)
+            #delete the temp book form
             tempBook.delete()
             return render(request,'library/bookadded.html')
 
     return render(request, 'library/modifybook.html',{'form':form})
 
+
+
 def aboutus_view(request):
     return render(request,'library/aboutus.html')
 
+#send an email for contact us view
 def contactus_view(request):
     sub = forms.ContactusForm()
     if request.method == 'POST':
@@ -444,6 +528,56 @@ def contactus_view(request):
             email = sub.cleaned_data['Email']
             name=sub.cleaned_data['Name']
             message = sub.cleaned_data['Message']
-            send_mail(str(name)+' || '+str(email),message, EMAIL_HOST_USER, ['wapka1503@gmail.com'], fail_silently = False)
+            send_mail(str(name)+' || '+str(email),message, EMAIL_HOST_USER, ['hadikhamoud@gmail.com'], fail_silently = False)
             return render(request, 'library/contactussuccess.html')
     return render(request, 'library/contactus.html', {'form':sub})
+
+#takes the link received in email and redirects the user to a login page
+#changes his status to activate his account
+def VerificationEmail(request,uidb64,token):
+    id = force_text(urlsafe_base64_decode(uidb64))
+    user=models.StudentExtra.objects.get(user__pk=id)
+    print(user)
+    if user.user.is_active:
+        #if already active dont do anything just redirect him
+        return redirect('studentlogin')
+    user.user.is_active=True
+    user.user.save()
+    return redirect('studentlogin')
+
+
+#function to check for duplicate requests of book by student
+def ifrequestedbefore(isbn,stid):
+    Borrower = models.Borrower.objects.filter(book__isbn=isbn).filter(student__user__username=stid)
+    if Borrower.exists():
+        return True
+    return False
+
+
+#used for admin to not view any duplicate Borrower objects since the
+#student can go back to the page and resubmit the form
+#this duplicate handling system could be used everywhere
+def deleteDuplicateBorrowers():
+    #order books by issue date in a query
+    BorrowerObjects = models.Borrower.objects.all().order_by('issue_date')
+    #check all the books from bottom to top
+    for rows in BorrowerObjects.reverse():
+        #if we find a matching one when iterating from bottom to top
+        temp = models.Borrower.objects.filter(student=rows.student,book=rows.book)
+        #remove the bottom one since we want the first instance of the Borrower object
+        if temp.count()>1:
+            rows.delete()
+
+
+#function that substracts the dates and calculate fines at 1$ per day
+#capped at 15$
+def CalculateFine(returndate):
+    days=date.today() - returndate
+    d=days
+    fine=0
+    d=d.days
+    if int(d)>0:
+        fine=d*1
+    if fine>15:
+        return 15
+    return fine
