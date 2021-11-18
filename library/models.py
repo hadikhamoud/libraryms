@@ -19,7 +19,7 @@ class StudentExtra(models.Model):
     def getuserid(self):
         return self.user.id
 def get_expiry():
-    return datetime.today() - timedelta(days=60)
+    return datetime.today() - timedelta(days=1)
 
 # + timedelta(days=30)
 
