@@ -104,7 +104,7 @@ def studentsignup_view(request):
             #use EmailMessage built in method send to send email
             email.send(fail_silently=False)
 
-        return HttpResponseRedirect('studentlogin')
+        return render(request,'library/PleaseVerify.html')
     return render(request,'library/studentsignup.html',context=mydict)
 
 
@@ -238,11 +238,15 @@ def issuebook_view(request):
             obj=models.Borrower()
             student = form.cleaned_data['enrollment2']
             book = form.cleaned_data['isbn2']
-            #student = models.StudentExtra.objects.get(pk=form.enrollment2)
-            #book = models.Book.objects.get(isbn = 'isbn2')
+            print(student,book)
+            #student = models.StudentExtra.objects.get(id=student)
+            #book = models.Book.objects.get(isbn = book)
             obj.student=student
             obj.book=book
             obj.status="Issued"
+            temp = models.Borrower.objects.filter(book = obj.book).filter(student = obj.student).filter(status="Issued")
+            if temp.exists():
+                return render(request,'library/bookissued.html')
             obj.save()
             print(obj.status,obj.student,obj.book)
             return render(request,'library/bookissued.html')
@@ -554,7 +558,7 @@ def contactus_view(request):
             email = sub.cleaned_data['Email']
             name=sub.cleaned_data['Name']
             message = sub.cleaned_data['Message']
-            send_mail(str(name)+' || '+str(email),message, EMAIL_HOST_USER, ['hadikhamoud@gmail.com'], fail_silently = False)
+            send_mail(str(name)+' || '+str(email),message, EMAIL_HOST_USER, ['noreply@libms.com'], fail_silently = False)
             return render(request, 'library/contactussuccess.html')
     return render(request, 'library/contactus.html', {'form':sub})
 
