@@ -98,7 +98,7 @@ def studentsignup_view(request):
             email = EmailMessage(
             email_subject,
             email_body,
-            'hadikhamoud@gmail.com',
+            'noreplylibms@gmail.com',
             [user.email]
             )
             #use EmailMessage built in method send to send email
