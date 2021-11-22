@@ -387,10 +387,32 @@ def viewissuedbookbystudent(request):
             fine = CalculateFine(ib.return_date.date())
             fine = "$" + str(fine)
             borrowerID = ib.id
+
             t=(issdate,expdate,fine,borrowerID)
             li2.append(t)
 
     return render(request,'library/viewissuedbookbystudent.html',{'li1':li1,'li2':li2})
+
+@login_required(login_url='studentlogin')
+def userhistory(request):
+    student=models.StudentExtra.objects.filter(user_id=request.user.id)
+    issuedbook=models.Borrower.objects.filter(student=student[0]).exclude(status="Pending").order_by('status')
+    li1=[]
+    li2=[]
+    for ib in issuedbook:
+        t=(ib.student.user.username,ib.student.enrollment,ib.student.branch,ib.book.name,ib.book.author)
+        li1.append(t)
+        issdate=str(ib.issue_date.day)+'-'+str(ib.issue_date.month)+'-'+str(ib.issue_date.year)
+        expdate=str(ib.return_date.day)+'-'+str(ib.return_date.month)+'-'+str(ib.return_date.year)
+        print(ib.return_date)
+        fine = CalculateFine(ib.return_date.date())
+        fine = "$" + str(fine)
+        borrowerID = ib.id
+        Status = ib.status
+        t=(issdate,expdate,fine,borrowerID,Status)
+
+        li2.append(t)
+    return render(request,'library/userhistory.html',{'li1':li1,'li2':li2})
 
 
 
@@ -436,6 +458,7 @@ def CloseToDeadline(request):
                     Selected=Selected[0]
                     Selected.status = "Returned"
                     Selected.save()
+                    return redirect('CloseToDeadline')
 
     return render(request, 'library/CloseToDeadline.html', {'li1':li1,'li2':li2})
 
@@ -540,7 +563,7 @@ def modifybook(request,isbn):
             Book.update(name=tempBook.name,isbn=tempBook.isbn,author=tempBook.author,category=tempBook.category)
             #delete the temp book form
             tempBook.delete()
-            return render(request,'library/bookadded.html')
+            return redirect('viewbook')
 
     return render(request, 'library/modifybook.html',{'form':form})
 
@@ -558,7 +581,7 @@ def contactus_view(request):
             email = sub.cleaned_data['Email']
             name=sub.cleaned_data['Name']
             message = sub.cleaned_data['Message']
-            send_mail(str(name)+' || '+str(email),message, EMAIL_HOST_USER, ['noreply@libms.com'], fail_silently = False)
+            send_mail(str(name)+' || '+str(email),message, EMAIL_HOST_USER, ['noreplylibms@gmail.com'], fail_silently = False)
             return render(request, 'library/contactussuccess.html')
     return render(request, 'library/contactus.html', {'form':sub})
 
