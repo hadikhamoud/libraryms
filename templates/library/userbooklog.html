@@ -109,7 +109,7 @@ border-radius: 5px;
     <th>Expiry Date</th>
     <th>Fine</th>
     <th>Renew</th>
-    <th>Book Returned</th>
+    <th>Return</th>
 
     </tr>
     </thead>
@@ -127,9 +127,15 @@ border-radius: 5px;
   {% csrf_token %}
   <td>  {{t.0}}</td>
   <td>  {{t.1}}</td>
-  <td>  {{t.2}}</td>
+
+  {% if t.4 == "Issued"%}
+    <td>  {{t.2}}</td>
   <td> <a href="{% url 'RenewBook' t.3 %}">Renew</a></td>
   <td><input type="checkbox" name="choices" value={{t.3}} class=Borrower></td>
+{% else%}
+<td>  $0</td>
+<td>  Returned</td>
+    {%endif%}
 
 </tr>
       {% endfor %}

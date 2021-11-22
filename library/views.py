@@ -470,7 +470,7 @@ def userbooklog(request,username):
     #take from the previous session page the user name of the user
     student=models.StudentExtra.objects.filter(user__username=username)
     #get all his issued books
-    issuedbook=models.Borrower.objects.filter(student=student[0]).filter(status="Issued")
+    issuedbook=models.Borrower.objects.filter(student=student[0]).exclude(status="Pending").order_by("status")
     li1=[]
     li2=[]
     #also same process as before in viewissuedbooksbystudent
@@ -492,7 +492,8 @@ def userbooklog(request,username):
             fine = CalculateFine(ib.return_date.date())
             fine = "$" + str(fine)
             BorrowerID = ib.id
-            t=(issdate,expdate,fine,BorrowerID)
+            Status = ib.status
+            t=(issdate,expdate,fine,BorrowerID,Status)
             li2.append(t)
     if request.method =="POST":
         id_list = request.POST.getlist("choices")
@@ -509,6 +510,9 @@ def userbooklog(request,username):
                 Selected=Selected[0]
                 Selected.status = "Returned"
                 Selected.save()
+                return HttpResponseRedirect(username)
+
+
 
 
     return render(request, 'library/userbooklog.html', {'li1':li1,'li2':li2})
