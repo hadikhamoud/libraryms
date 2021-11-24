@@ -109,7 +109,7 @@ border-radius: 5px;
     <th>Issue Date</th>
     <th>Expiry Date</th>
     <th>Fine</th>
-    <th>Renew</th>
+    <th>Status</th>
     </tr>
     </thead>
     <tfoot>
@@ -132,7 +132,8 @@ border-radius: 5px;
 
   {%else%}
   <td>  {{t.2}}</td>
-<td><a href="{% url 'RenewBook' t.3 %}">Renew<a></td>
+  <td>  Issued</td>
+<!--<td><a href="{% url 'RenewBook' t.3 %}">Renew<a></td>-->
   {%endif%}
 
 </tr>

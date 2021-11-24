@@ -98,7 +98,7 @@ def studentsignup_view(request):
             email = EmailMessage(
             email_subject,
             email_body,
-            'hadikhamoud@gmail.com',
+            'noreplylibms@gmail.com',
             [user.email]
             )
             #use EmailMessage built in method send to send email
@@ -458,7 +458,7 @@ def CloseToDeadline(request):
                     Selected=Selected[0]
                     Selected.status = "Returned"
                     Selected.save()
-                    return redirect('CloseToDeadline')
+            return redirect('CloseToDeadline')
 
     return render(request, 'library/CloseToDeadline.html', {'li1':li1,'li2':li2})
 
