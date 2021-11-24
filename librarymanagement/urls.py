@@ -41,7 +41,7 @@ urlpatterns = [
     path('afterlogin', views.afterlogin_view,name='afterlogin'),
 
     path('addbook', views.addbook_view),
-    path('viewbook', views.viewbook_view),
+    path('viewbook', views.viewbook_view,name = 'viewbook'),
     path('issuebook', views.issuebook_view),
     path('viewissuedbook', views.viewissuedbook_view),
     path('viewstudent', views.viewstudent_view),
@@ -59,6 +59,7 @@ urlpatterns = [
     path('RenewBook/<str:borrowerID>/', views.RenewBook, name='RenewBook'),
     path('ComingUp', views.ComingUp, name='ComingUp'),
     path('CloseToDeadline', views.CloseToDeadline, name='CloseToDeadline'),
-    path('activate/<uidb64>/<token>',views.VerificationEmail, name = 'activate')
+    path('activate/<uidb64>/<token>',views.VerificationEmail, name = 'activate'),
+    path('userhistory', views.userhistory),
 
 ]
