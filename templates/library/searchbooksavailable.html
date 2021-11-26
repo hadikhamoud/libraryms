@@ -62,7 +62,7 @@ border-radius: 5px;
     <form class="d-flex" method=POST action="{% url 'searchbooksavailable' %}">
       {% csrf_token %}
 
-      <input type="text" placeholder="Search by book or isbn" name="searched">
+      <input type="text" placeholder="Search by name or isbn" name="searched">
       <button type="submit"><i class="fa fa-search"></i></button>
     </form>
 {% if books%}

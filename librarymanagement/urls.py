@@ -65,4 +65,5 @@ urlpatterns = [
     path('searchbooksadmin', views.searchbooksadmin, name = "searchbooksadmin"),
     path('searchbookrequests', views.searchbookrequests, name = "searchbookrequests"),
     path('searchstudent', views.searchstudent, name = "searchstudent"),
+    path('searchbooksavailable', views.searchbooksavailable, name = "searchbooksavailable"),
 ]
