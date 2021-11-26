@@ -61,14 +61,14 @@ border-radius: 5px;
     <br>
     <br>
     <h3 class="p-3 mb-2 bg-primary text-white" style = 'font-size: 50px;text-align:center;margin-bottom:0px;'>Book Requests!</h3>
+    <form class="d-flex" method=POST action="{% url 'searchbookrequests' %}">
+      {% csrf_token %}
 
+      <input type="text" placeholder="Search by book or student" name="searched">
+      <button type="submit"><i class="fa fa-search"></i></button>
+    </form>
 {% if li%}
-<form class="d-flex" method=POST action="{% url 'searchbookrequests' %}">
-  {% csrf_token %}
 
-  <input type="text" placeholder="Search by book or student" name="searched">
-  <button type="submit"><i class="fa fa-search"></i></button>
-</form>
     <table class="redTable">
     <thead>
     <tr>

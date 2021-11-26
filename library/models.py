@@ -55,9 +55,10 @@ class Book(models.Model):
         ('history', 'History'),
         ]
     name=models.CharField(max_length=30)
-    isbn=models.PositiveIntegerField()
+    isbn=models.PositiveIntegerField(unique=True)
     author=models.CharField(max_length=40)
     category=models.CharField(max_length=30,choices=catchoice,default='education')
+    Active=models.BooleanField(default = True)
     def __str__(self):
         return str(self.name)+"["+str(self.isbn)+']'
 

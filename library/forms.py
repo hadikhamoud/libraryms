@@ -51,17 +51,5 @@ class BookForm(forms.ModelForm):
 class IssuedBookForm(forms.Form):
     #to_field_name value will be stored when form is submitted.....__str__ method of book model will be shown there in html
 
-    isbn2=forms.ModelChoiceField(queryset=models.Book.objects.none(),empty_label="Name and isbn",to_field_name="pk",label='Name and Isbn')
-    enrollment2=forms.ModelChoiceField(queryset=models.StudentExtra.objects.all(),empty_label="Name and enrollment",to_field_name="pk",label='Name and enrollment')
-
-    def __init__(self, *args, **kwargs):
-        super(IssuedBookForm, self).__init__(*args, **kwargs)
-        booksAvailable = models.Book.objects.all()
-        print(booksAvailable)
-        for ib in booksAvailable:
-            Borrowers = models.Borrower.objects.filter(book = ib).filter(status = "Issued")
-            if Borrowers.exists():
-                booksAvailable = booksAvailable.exclude(isbn = ib.isbn)
-        print(booksAvailable)
-
-        self.fields['isbn2'].queryset = booksAvailable
+    isbn2=forms.IntegerField()
+    username2=forms.CharField()
