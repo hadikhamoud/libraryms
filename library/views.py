@@ -179,28 +179,30 @@ def searchbooksadmin(request):
         return render(request, 'library/searchbooksadmin.html',{'books':Books})
 
 
+def checkavailablebooks(books,studentID):
+    
+    #iterate through books and if you find a book that has been "Issued" by another student
+    #remove the book from the query
+    for ib in books:
+        #Borrower removes the book if the student has it already or has already requested it
+        Borrower = models.Borrower.objects.filter(book=ib).filter(student__user_id=studentID).filter(status="Pending")
+        #Availability removes the book if anyone else has it issued
+        Availability = models.Borrower.objects.filter(book=ib).filter(status="Issued")
 
+        #exlude both from the main query
+        if Borrower.exists():
+
+            books = books.exclude(isbn=ib.isbn)
+        if Availability.exists():
+            books = books.exclude(isbn=ib.isbn)
+    return books
 
 #(could be enhanced)
 @login_required(login_url='studentlogin')
 def booksAvailable_view(request):
     #view to show the available books for student, first query all books
-    books=models.Book.objects.filter(Active = True).order_by('category')
-    #iterate through books and if you find a book that has been "Issued" by another student
-    #remove the book from the query
-    for ib in books:
-        #Borrower removes the book if the student has it already or has already requested it
-        Borrower = models.Borrower.objects.filter(book=ib).filter(student__user_id=request.user.id).filter(status="Pending")
-        #Availability removes the book if anyone else has it issued
-        Availability = models.Borrower.objects.filter(book=ib).filter(status="Issued")
-        print(Borrower)
-        #exlude both from the main query
-        if Borrower.exists():
-            print(True)
-            books = books.exclude(isbn=ib.isbn)
-        if Availability.exists():
-            books = books.exclude(isbn=ib.isbn)
-    #done with the first part, now to let the student request the books
+    tempbooks = models.Book.objects.filter(Active = True).order_by('category')
+    books=checkavailablebooks(tempbooks,request.user.id)
 
     #get all the checkboxes that the student has submitted into id_list
     if request.method =="POST":
@@ -388,6 +390,53 @@ def searchbookrequests(request):
     return render(request, 'library/searchbookrequests.html')
 
 
+@login_required(login_url='studentlogin')
+def searchbooksavailable(request):
+    if request.method == "POST":
+            try:
+                searched = request.POST['searched']
+                Books = models.Book.objects.filter(name__contains = searched).filter(Active =True)
+                print('contains',Books)
+                Books = checkavailablebooks(Books,request.user.id)
+                try:
+                    Booksbyisbn = models.Book.objects.filter(isbn__contains = int(searched)).filter(Active =True)
+                    Booksbyisbn = checkavailablebooks(Booksbyisbn,request.user.id)
+                    print("byisbn",Booksbyisbn)
+                except:
+                    Booksbyisbn = models.Book.objects.none()
+
+                Books = set(chain(Books,Booksbyisbn))
+                print("chain",Books)
+            except:
+                Books = models.Book.objects.filter(Active = True)
+                Books = checkavailablebooks(Books,request.user.id)
+
+            id_list = request.POST.getlist("choices")
+
+            #id list contains all the isbns of the books chosen
+            for ib in id_list:
+                #iterate through isbns and create Borrower objects with status "pending"
+                obj = models.Borrower()
+                SelectedBook=models.Book.objects.filter(isbn=ib)
+                if SelectedBook.exists():
+                    #assign book of Borrower object
+                    obj.book=SelectedBook[0]
+
+                tempstudent=models.StudentExtra.objects.filter(user_id=request.user.id)
+                if tempstudent.exists():
+                    #assign student of Borrower object
+                    obj.student=tempstudent[0]
+                #status "pending" means that the book has been requested and not yet approved
+                obj.status="Pending"
+                obj.save()
+
+                #exlude the book that has been ordered now
+                Books = Books.exclude(id=obj.book.id)
+
+    #return to html the query of books
+            return render(request, 'library/searchbooksavailable.html',{'books':Books})
+    return render(request,'library/searchbooksavailable.html')
+
 
 
 
@@ -445,8 +494,12 @@ def ComingUp(request):
             #expdate=0
         #fine calculation
             print(ib.return_date)
-            fine = CalculateFine(ib.return_date.date())
-            fine = "$" + str(fine)
+            timeTemp = date.today() - ib.return_date.date()
+            if int(timeTemp.days)>0:
+                ib.Fine = CalculateFine(ib.return_date.date())
+                ib.save()
+
+            fine = "$" + str(ib.Fine)
             borrowerID = ib.id
             t=(issdate,expdate,fine,borrowerID)
             li2.append(t)
@@ -474,9 +527,12 @@ def viewissuedbookbystudent(request):
             expdate=str(ib.return_date.day)+'-'+str(ib.return_date.month)+'-'+str(ib.return_date.year)
             #expdate=0
         #fine calculation
-            print(ib.return_date)
-            fine = CalculateFine(ib.return_date.date())
-            fine = "$" + str(fine)
+            timeTemp = date.today() - ib.return_date.date()
+            if int(timeTemp.days)>0:
+                ib.Fine = CalculateFine(ib.return_date.date())
+                ib.save()
+
+            fine = "$" + str(ib.Fine)
             borrowerID = ib.id
 
             t=(issdate,expdate,fine,borrowerID)
@@ -496,14 +552,23 @@ def userhistory(request):
         issdate=str(ib.issue_date.day)+'-'+str(ib.issue_date.month)+'-'+str(ib.issue_date.year)
         expdate=str(ib.return_date.day)+'-'+str(ib.return_date.month)+'-'+str(ib.return_date.year)
         print(ib.return_date)
-        fine = CalculateFine(ib.return_date.date())
-        fine = "$" + str(fine)
+        timeTemp = date.today() - ib.return_date.date()
+        if int(timeTemp.days)>0:
+            ib.Fine = CalculateFine(ib.return_date.date())
+            ib.save()
+
+        fine = "$" + str(ib.Fine)
         borrowerID = ib.id
         Status = ib.status
         t=(issdate,expdate,fine,borrowerID,Status)
 
         li2.append(t)
     return render(request,'library/userhistory.html',{'li1':li1,'li2':li2})
+
+
+
+
+
 
 
 
@@ -529,8 +594,12 @@ def CloseToDeadline(request):
                 #expdate=0
             #fine calculation
                 print(ib.return_date)
-                fine = CalculateFine(ib.return_date.date())
-                fine = "$" + str(fine)
+                timeTemp = date.today() - ib.return_date.date()
+                if int(timeTemp.days)>0:
+                    ib.Fine = CalculateFine(ib.return_date.date())
+                    ib.save()
+
+                fine = "$" + str(ib.Fine)
                 borrowerID = ib.id
                 t=(issdate,expdate,fine,borrowerID)
                 li2.append(t)
@@ -548,6 +617,7 @@ def CloseToDeadline(request):
                     print(Selected)
                     Selected=Selected[0]
                     Selected.status = "Returned"
+                    Selected.Fine = 0
                     Selected.save()
             return redirect('CloseToDeadline')
 
@@ -580,8 +650,12 @@ def userbooklog(request,username):
             expdate=str(ib.return_date.day)+'-'+str(ib.return_date.month)+'-'+str(ib.return_date.year)
 
 
-            fine = CalculateFine(ib.return_date.date())
-            fine = "$" + str(fine)
+            timeTemp = date.today() - ib.return_date.date()
+            if int(timeTemp.days)>0:
+                ib.Fine = CalculateFine(ib.return_date.date())
+                ib.save()
+
+            fine = "$" + str(ib.Fine)
             BorrowerID = ib.id
             Status = ib.status
             t=(issdate,expdate,fine,BorrowerID,Status)
@@ -600,6 +674,7 @@ def userbooklog(request,username):
 
                 Selected=Selected[0]
                 Selected.status = "Returned"
+                Selected.Fine = 0
                 Selected.save()
         return HttpResponseRedirect(username)
 

@@ -20,7 +20,10 @@ class StudentExtra(models.Model):
         return self.user.id
 
 def get_expiry():
-    return datetime.today() + timedelta(days=1)
+    return datetime.today() + timedelta(days=30)
+
+
+
 
 # + timedelta(days=30)
 
@@ -31,6 +34,7 @@ class Borrower(models.Model):
     return_date = models.DateTimeField(default=get_expiry())
     status = models.CharField(max_length=40,null=True)
     Renewed = models.BooleanField(default=False)
+    Fine = models.PositiveIntegerField(default = 0)
 
 
 
