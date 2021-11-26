@@ -55,11 +55,18 @@ border-radius: 5px;
 </style>
   </head>
   <body>
-    {% include "library/navbarstudent.html" %}
+    {% include "library/navbaradmin.html" %}
     <br>
     <br>
     <h3 class="p-3 mb-2 bg-primary text-white" style = 'font-size: 50px;text-align:center;'>Available Book in Library !</h3>
+    <form class="d-flex" method=POST action="{% url 'searchbooksadmin' %}">
+      {% csrf_token %}
+
+      <input type="text" placeholder="Search by name or isbn" name="searched">
+      <button type="submit"><i class="fa fa-search"></i></button>
+  </form>
 {% if books%}
+
 <table class="redTable">
 <thead>
 <tr>
@@ -78,25 +85,25 @@ border-radius: 5px;
 </tr>
 </tfoot>
 <tbody>
-<form method ="POST">
 
   {% for book in books %}
-  <tr>
-      {% csrf_token %}
+    <tr>
       <td>{{book.name}}</td>
       <td>{{book.isbn}}</td>
       <td>{{book.author}}</td>
       <td>{{book.category}}</td>
-      <td><input type="checkbox" name="choices" value={{book.isbn}}  class="Book"></td>
+      <td><a href="{% url 'modifybook' book.isbn %}"</a>Modify Book</td>
+          <td><a href="{% url 'deletebook' book.isbn %}"</a>Delete Book</td>
 
-  </tr>
+    </tr>
   {% endfor %}
 </tbody>
-<input type="submit" value = "Request Books"/>
-      </form>
 </table>
+
+
+
 {%else%}
-<h1>0 Books Available</h1>
+<h1>Have 0 book</h1>
 {%endif%}
 
 

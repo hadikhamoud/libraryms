@@ -64,6 +64,12 @@ border-radius: 5px;
     <h3 class="p-3 mb-2 bg-primary text-white" style = 'font-size: 50px;text-align:center;'>Student registered in Library !</h3>
 
     {% if students%}
+    <form class="d-flex" method=POST action="{% url 'searchstudent' %}">
+      {% csrf_token %}
+
+      <input type="text" placeholder="Search by username" name="searched">
+      <button type="submit"><i class="fa fa-search"></i></button>
+    </form>
 <table class="redTable">
 <thead>
 <tr>

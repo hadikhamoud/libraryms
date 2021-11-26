@@ -2,6 +2,7 @@
 <html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8">
+
     <title></title>
 
 
@@ -60,8 +61,8 @@ border-radius: 5px;
 
   </head>
   <body>
-  {% include "library/navbaradmin.html" %}<br><br>
-  <h3 class="p-3 mb-2 bg-primary text-white" style = 'font-size: 50px;text-align:center;'>Book History for User !</h3>
+  {% include "library/navbarstudent.html" %}<br><br>
+  <h3 class="p-3 mb-2 bg-primary text-white" style = 'font-size: 50px;text-align:center;'>Your Book History !</h3>
 
 <div class="row">
 
@@ -108,9 +109,7 @@ border-radius: 5px;
     <th>Issue Date</th>
     <th>Expiry Date</th>
     <th>Fine</th>
-    <th>Renew</th>
-    <th>Return</th>
-
+    <th>Status</th>
     </tr>
     </thead>
     <tfoot>
@@ -121,31 +120,28 @@ border-radius: 5px;
     </tr>
     </tfoot>
     <tbody>
-      <form method = "POST">
+
       {% for t in li2 %}
 <tr>
-  {% csrf_token %}
   <td>  {{t.0}}</td>
   <td>  {{t.1}}</td>
 
-  {% if t.4 == "Issued"%}
-    <td>  {{t.2}}</td>
-  <td> <a href="{% url 'RenewBook' t.3 %}">Renew</a></td>
-  <td><input type="checkbox" name="choices" value={{t.3}} class=Borrower></td>
-{% else%}
-<td>  $0</td>
-<td>  Returned</td>
-    {%endif%}
+  {%if t.4 == "Returned" %}
+  <td>  $0</td>
+  <td>  Returned</td>
+
+  {%else%}
+  <td>  {{t.2}}</td>
+  <td>  Issued</td>
+<!--<td><a href="{% url 'RenewBook' t.3 %}">Renew<a></td>-->
+  {%endif%}
 
 </tr>
       {% endfor %}
     </tbody>
-
     </table>
-    <input type="submit" value="Return"/>
-  </form>
     {%else%}
-    <h1> No book History!</h1>
+    <h1> No book Issued to you</h1>
     {%endif%}
 
 </div></div>

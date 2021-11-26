@@ -1,8 +1,11 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
   <head>
-<style media="screen">
-table.redTable {
+    <meta charset="utf-8">
+    <title></title>
+
+    <style media="screen">
+    table.redTable {
 border: 2px solid #A40808;
 background-color: #EEE7DB;
 width: 100%;
@@ -52,55 +55,57 @@ color: #A40808;
 padding: 2px 8px;
 border-radius: 5px;
 }
-</style>
+    </style>
   </head>
   <body>
-    {% include "library/navbarstudent.html" %}
+    {% include "library/navbaradmin.html" %}
     <br>
     <br>
-    <h3 class="p-3 mb-2 bg-primary text-white" style = 'font-size: 50px;text-align:center;'>Available Book in Library !</h3>
-{% if books%}
+    <h3 class="p-3 mb-2 bg-primary text-white" style = 'font-size: 50px;text-align:center;'>Student registered in Library !</h3>
+    <form class="d-flex" method=POST action="{% url 'searchstudent' %}">
+      {% csrf_token %}
+
+      <input type="text" placeholder="Search by username" name="searched">
+      <button type="submit"><i class="fa fa-search"></i></button>
+    </form>
+    {% if students%}
 <table class="redTable">
 <thead>
 <tr>
-<th>Book Name</th>
-<th>ISBN</th>
-<th>Author</th>
-<th>Category</th>
-<th></th>
+<th>Name</th>
+<th>Enrollment</th>
+<th>Branch</th>
+<th>View Book Log</th>
 </tr>
 </thead>
 <tfoot>
 <tr>
-<td colspan="4" rowspan="4">
+<td colspan="3">
 <div class="links"></div>
 </td>
 </tr>
 </tfoot>
 <tbody>
-<form method ="POST">
+  {% for s in students %}
+    <tr>
+      <td>{{s.get_name}}</td>
+      <td>{{s.enrollment}}</td>
+      <td>{{s.branch}}</td>
+      <td><a href="{% url 'userbooklog' s.user.username %}">view</a></td>
+    </tr>
 
-  {% for book in books %}
-  <tr>
-      {% csrf_token %}
-      <td>{{book.name}}</td>
-      <td>{{book.isbn}}</td>
-      <td>{{book.author}}</td>
-      <td>{{book.category}}</td>
-      <td><input type="checkbox" name="choices" value={{book.isbn}}  class="Book"></td>
-
-  </tr>
   {% endfor %}
 </tbody>
-<input type="submit" value = "Request Books"/>
-      </form>
 </table>
 {%else%}
-<h1>0 Books Available</h1>
+<h1> No Student Registered in Library</h1>
 {%endif%}
 
 
-<br><br><br><br><br><br><br><br><br>
+
+<br><br><br><br><br><br>
+
+<br><br><br>
 
   </body>
 </html>

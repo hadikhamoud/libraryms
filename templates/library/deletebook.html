@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
   <head>
-<style media="screen">
-table.redTable {
+    <meta charset="utf-8">
+    <title></title>
+    <style media="screen">
+    table.redTable {
 border: 2px solid #A40808;
 background-color: #EEE7DB;
 width: 100%;
@@ -52,55 +54,56 @@ color: #A40808;
 padding: 2px 8px;
 border-radius: 5px;
 }
-</style>
+    </style>
   </head>
   <body>
-    {% include "library/navbarstudent.html" %}
+    {% include "library/navbaradmin.html" %}
     <br>
     <br>
-    <h3 class="p-3 mb-2 bg-primary text-white" style = 'font-size: 50px;text-align:center;'>Available Book in Library !</h3>
-{% if books%}
-<table class="redTable">
-<thead>
-<tr>
-<th>Book Name</th>
-<th>ISBN</th>
-<th>Author</th>
-<th>Category</th>
-<th></th>
-</tr>
-</thead>
-<tfoot>
-<tr>
-<td colspan="4" rowspan="4">
-<div class="links"></div>
-</td>
-</tr>
-</tfoot>
-<tbody>
-<form method ="POST">
+    <h3 class="p-3 mb-2 bg-primary text-white" style = 'font-size: 50px;text-align:center;margin-bottom:0px;'>Issued books to Student !</h3>
 
-  {% for book in books %}
-  <tr>
-      {% csrf_token %}
-      <td>{{book.name}}</td>
-      <td>{{book.isbn}}</td>
-      <td>{{book.author}}</td>
-      <td>{{book.category}}</td>
-      <td><input type="checkbox" name="choices" value={{book.isbn}}  class="Book"></td>
+{% if li%}
+      <h1> Are you sure you want to delete this book?</h1>
+    <table class="redTable">
+    <thead>
+    <tr>
 
-  </tr>
-  {% endfor %}
-</tbody>
-<input type="submit" value = "Request Books"/>
-      </form>
-</table>
-{%else%}
-<h1>0 Books Available</h1>
-{%endif%}
+    <th>Book Name</th>
+    <th>Book Author</th>
 
 
-<br><br><br><br><br><br><br><br><br>
+
+    </tr>
+    </thead>
+    <tfoot>
+    <tr>
+    <td colspan="7">
+    <div class="links"></div>
+    </td>
+    </tr>
+    </tfoot>
+    <tbody>
+        <form method ="POST">
+{%for t in li%}
+
+        <tr>
+            {%csrf_token %}
+
+
+          <td>{{t.name}}</td>
+          <td>{{t.author}}</td>
+
+        </tr>
+{%endfor%}
+    </tbody>
+    <input type="submit" value = "Delete"/>
+        </form>
+    </table>
+    {%else%}
+    <h1> 0 book Issued</h1>
+    {%endif%}
+
+    <br><br><br><br><br><br><br><br><br>
 
   </body>
 </html>

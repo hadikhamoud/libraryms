@@ -18,8 +18,9 @@ class StudentExtra(models.Model):
     @property
     def getuserid(self):
         return self.user.id
+
 def get_expiry():
-    return datetime.today() + timedelta(days=30)
+    return datetime.today() + timedelta(days=1)
 
 # + timedelta(days=30)
 
@@ -54,9 +55,10 @@ class Book(models.Model):
         ('history', 'History'),
         ]
     name=models.CharField(max_length=30)
-    isbn=models.PositiveIntegerField()
+    isbn=models.PositiveIntegerField(unique=True)
     author=models.CharField(max_length=40)
     category=models.CharField(max_length=30,choices=catchoice,default='education')
+    Active=models.BooleanField(default = True)
     def __str__(self):
         return str(self.name)+"["+str(self.isbn)+']'
 

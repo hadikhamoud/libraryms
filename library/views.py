@@ -17,6 +17,7 @@ from django.contrib.sites.shortcuts import get_current_site
 from django.urls import reverse
 from .utils import token_generator
 from django.shortcuts import redirect
+from itertools import chain
 
 
 
@@ -98,7 +99,7 @@ def studentsignup_view(request):
             email = EmailMessage(
             email_subject,
             email_body,
-            'hadikhamoud@gmail.com',
+            'noreplylibms@gmail.com',
             [user.email]
             )
             #use EmailMessage built in method send to send email
@@ -158,15 +159,33 @@ def addbook_view(request):
 @user_passes_test(is_admin)
 def viewbook_view(request):
     #query that shows all books for admin
-    books=models.Book.objects.all()
+    books=models.Book.objects.filter(Active = True).order_by('category')
     return render(request,'library/viewbook.html',{'books':books})
+
+@login_required(login_url='adminlogin')
+@user_passes_test(is_admin)
+def searchbooksadmin(request):
+    if request.method == "POST":
+        searched = request.POST['searched']
+        Books = models.Book.objects.filter(name__contains = searched).filter(Active =True)
+        try:
+            Booksbyisbn = models.Book.objects.filter(isbn__contains = int(searched)).filter(Active =True)
+            print(Booksbyisbn)
+        except:
+            Booksbyisbn = models.Book.objects.none()
+
+        Books = list(chain(Books,Booksbyisbn))
+        print("books",Books)
+        return render(request, 'library/searchbooksadmin.html',{'books':Books})
+
+
 
 
 #(could be enhanced)
 @login_required(login_url='studentlogin')
 def booksAvailable_view(request):
     #view to show the available books for student, first query all books
-    books=models.Book.objects.all()
+    books=models.Book.objects.filter(Active = True).order_by('category')
     #iterate through books and if you find a book that has been "Issued" by another student
     #remove the book from the query
     for ib in books:
@@ -231,25 +250,31 @@ def issuebook_view(request):
 #to be fixed
 def issuebook_view(request):
     form=forms.IssuedBookForm()
+    issuedBefore = []
     if request.method=='POST':
         #now this form have data from html
         form=forms.IssuedBookForm(request.POST)
         if form.is_valid():
             obj=models.Borrower()
-            student = form.cleaned_data['enrollment2']
-            book = form.cleaned_data['isbn2']
-            print(student,book)
-            #student = models.StudentExtra.objects.get(id=student)
-            #book = models.Book.objects.get(isbn = book)
-            obj.student=student
-            obj.book=book
-            obj.status="Issued"
-            temp = models.Borrower.objects.filter(book = obj.book).filter(student = obj.student).filter(status="Issued")
-            if temp.exists():
-                return render(request,'library/bookissued.html')
-            obj.save()
-            print(obj.status,obj.student,obj.book)
-            return render(request,'library/bookissued.html')
+            username = form.cleaned_data['username2']
+            isbn = form.cleaned_data['isbn2']
+            selectedStudent = models.StudentExtra.objects.filter(user__username = username)
+            selectedBook = models.Book.objects.filter(isbn = isbn)
+            if selectedStudent.exists() and selectedBook.exists():
+                obj.student=selectedStudent[0]
+                obj.book=selectedBook[0]
+                obj.status="Issued"
+
+                temp2 = models.Borrower.objects.filter(book = obj.book).filter(status="Pending").delete()
+                temp3 = models.Borrower.objects.filter(book = obj.book).filter(status="Issued")
+                print(temp3)
+                if temp3.exists():
+                    issuedBefore.append(True)
+                    return render(request,'library/bookissued.html',{"issuedBefore":issuedBefore})
+                obj.save()
+
+
+                return render(request,'library/bookissued.html',{"issuedBefore":issuedBefore})
     return render(request,'library/issuebook.html',{'form':form})
 
 
@@ -313,6 +338,60 @@ def viewissuedbook_view(request):
                print(Selected.status)
     return render(request,'library/viewissuedbook.html',{'li':li})
 
+@login_required(login_url='adminlogin')
+@user_passes_test(is_admin)
+def searchbookrequests(request):
+    deleteDuplicateBorrowers()
+
+    if request.method == "POST":
+
+            try:
+                searched = request.POST['searched']
+                print(searched)
+                BorrowerBystudent = models.Borrower.objects.filter(student__user__username__contains = searched).filter(status="Pending")
+                BorrowerBybookname = models.Borrower.objects.filter(book__name__contains = searched).filter(book__Active=True).filter(status="Pending")
+                try:
+                    Borrowersbyisbn =  models.Borrower.objects.filter(book__isbn__contains = int(searched)).filter(book__Active=True).filter(status="Pending")
+                    print(Borrowersbyisbn)
+                except:
+                    Borrowersbyisbn = models.Book.objects.none()
+                Requests = set(chain(BorrowerBystudent,BorrowerBybookname,Borrowersbyisbn))
+                print(Requests)
+            except:
+                Requests = models.Borrower.objects.filter(status = "Pending")
+
+
+
+
+            #return render(request, 'library/searchbookrequests.html',{'li':Requests})
+
+
+
+            id_list = request.POST.getlist("choices")
+            print(id_list)
+            for ib in id_list:
+               #get the suitable borrower object
+               Selected=models.Borrower.objects.filter(id = ib)
+               if Selected.exists():
+                   #change the status to "Issued"
+                   print(Selected)
+                   Selected=Selected[0]
+                   Selected.status = "Issued"
+                   Selected.save()
+                   #delete all the requests for this book from other users since he has gotten it
+                   #(could be modified if we add multiple copies)
+                   models.Borrower.objects.filter(book__isbn=Selected.book.isbn).exclude(student__user__username = Selected.student.user.username).delete()
+                   print(Selected.issue_date)
+                   print(Selected.status)
+
+            return render(request, 'library/searchbookrequests.html',{'li':Requests})
+    return render(request, 'library/searchbookrequests.html')
+
+
+
+
+
+
 #views all the student
 
 @login_required(login_url='adminlogin')
@@ -321,6 +400,18 @@ def viewstudent_view(request):
     #query all the students and return
     students=models.StudentExtra.objects.all()
     return render(request,'library/viewstudent.html',{'students':students})
+
+@login_required(login_url='adminlogin')
+@user_passes_test(is_admin)
+def searchstudent(request):
+    if request.method == "POST":
+        searched = request.POST['searched']
+        Students = models.StudentExtra.objects.filter(user__username__contains = searched)
+        return render(request,'library/searchstudent.html',{'students':Students})
+    return render(request,'library/searchstudent.html')
+
+
+
 
 #check all the books that are coming up
 #could be enhanced (books could be replaced by ib)
@@ -387,10 +478,32 @@ def viewissuedbookbystudent(request):
             fine = CalculateFine(ib.return_date.date())
             fine = "$" + str(fine)
             borrowerID = ib.id
+
             t=(issdate,expdate,fine,borrowerID)
             li2.append(t)
 
     return render(request,'library/viewissuedbookbystudent.html',{'li1':li1,'li2':li2})
+
+@login_required(login_url='studentlogin')
+def userhistory(request):
+    student=models.StudentExtra.objects.filter(user_id=request.user.id)
+    issuedbook=models.Borrower.objects.filter(student=student[0]).exclude(status="Pending").order_by('status')
+    li1=[]
+    li2=[]
+    for ib in issuedbook:
+        t=(ib.student.user.username,ib.student.enrollment,ib.student.branch,ib.book.name,ib.book.author)
+        li1.append(t)
+        issdate=str(ib.issue_date.day)+'-'+str(ib.issue_date.month)+'-'+str(ib.issue_date.year)
+        expdate=str(ib.return_date.day)+'-'+str(ib.return_date.month)+'-'+str(ib.return_date.year)
+        print(ib.return_date)
+        fine = CalculateFine(ib.return_date.date())
+        fine = "$" + str(fine)
+        borrowerID = ib.id
+        Status = ib.status
+        t=(issdate,expdate,fine,borrowerID,Status)
+
+        li2.append(t)
+    return render(request,'library/userhistory.html',{'li1':li1,'li2':li2})
 
 
 
@@ -436,6 +549,7 @@ def CloseToDeadline(request):
                     Selected=Selected[0]
                     Selected.status = "Returned"
                     Selected.save()
+            return redirect('CloseToDeadline')
 
     return render(request, 'library/CloseToDeadline.html', {'li1':li1,'li2':li2})
 
@@ -447,7 +561,7 @@ def userbooklog(request,username):
     #take from the previous session page the user name of the user
     student=models.StudentExtra.objects.filter(user__username=username)
     #get all his issued books
-    issuedbook=models.Borrower.objects.filter(student=student[0]).filter(status="Issued")
+    issuedbook=models.Borrower.objects.filter(student=student[0]).exclude(status="Pending").order_by("status")
     li1=[]
     li2=[]
     #also same process as before in viewissuedbooksbystudent
@@ -455,9 +569,9 @@ def userbooklog(request,username):
         return render(request, 'library/userbooklog.html', {'li1':li1,'li2':li2})
 
     for ib in issuedbook:
-        print(ib)
+
         books=models.Borrower.objects.filter(student=ib.student,book=ib.book)
-        print(books)
+
 
         if len(books)>0:
             t=(ib.student.user.username,ib.student.enrollment,ib.student.branch,ib.book.name,ib.book.author)
@@ -469,11 +583,12 @@ def userbooklog(request,username):
             fine = CalculateFine(ib.return_date.date())
             fine = "$" + str(fine)
             BorrowerID = ib.id
-            t=(issdate,expdate,fine,BorrowerID)
+            Status = ib.status
+            t=(issdate,expdate,fine,BorrowerID,Status)
             li2.append(t)
     if request.method =="POST":
         id_list = request.POST.getlist("choices")
-        print(id_list)
+
         #id list contains all the isbns of the books chosen
         for ib in id_list:
             #iterate through isbns and create Borrower objects with status "pending"
@@ -482,10 +597,13 @@ def userbooklog(request,username):
             Selected=models.Borrower.objects.filter(id=ib).filter(status="Issued")
             if Selected.exists():
              #change the status to "Issued"
-                print(Selected)
+
                 Selected=Selected[0]
                 Selected.status = "Returned"
                 Selected.save()
+        return HttpResponseRedirect(username)
+
+
 
 
     return render(request, 'library/userbooklog.html', {'li1':li1,'li2':li2})
@@ -521,12 +639,15 @@ def RenewBook(request,borrowerID):
 
 
 
+
+
+
 #modify book information
 @login_required(login_url='adminlogin')
 @user_passes_test(is_admin)
 def modifybook(request,isbn):
     #get isbn from previous page in same session
-    Book = models.Book.objects.filter(isbn=isbn)
+    Book = models.Book.objects.filter(isbn=isbn).filter(Active = True)
     #fill the form initially with the old information
     form=forms.BookForm(initial={"name":Book[0].name,"isbn":Book[0].isbn,"author":Book[0].author,"category":Book[0].category})
     if request.method=='POST':
@@ -540,9 +661,31 @@ def modifybook(request,isbn):
             Book.update(name=tempBook.name,isbn=tempBook.isbn,author=tempBook.author,category=tempBook.category)
             #delete the temp book form
             tempBook.delete()
-            return render(request,'library/bookadded.html')
+            return redirect('viewbook')
 
     return render(request, 'library/modifybook.html',{'form':form})
+
+@login_required(login_url='adminlogin')
+@user_passes_test(is_admin)
+def deletebook(request,isbn):
+    #check all the active books
+    Book = models.Book.objects.filter(isbn=isbn).filter(Active = True)
+    print(Book)
+    if request.method=='POST':
+        #once you want to delete the book
+        Selected = Book[0]
+        #Sets the active as false which means it is hidden
+        #we're doing this to preserve the user history borrower objects
+        Selected.Active = False
+        Selected.save()
+        #delete all the requests and the issures for this book
+        BorrowersOfSelected = models.Borrower.objects.filter(book = Selected).exclude(status = "Returned").delete()
+        print(Selected.Active,"Post")
+        return render(request,'library/deleted.html')
+    return render(request, 'library/deletebook.html',{'li':Book})
+
+
+
 
 
 
@@ -558,7 +701,7 @@ def contactus_view(request):
             email = sub.cleaned_data['Email']
             name=sub.cleaned_data['Name']
             message = sub.cleaned_data['Message']
-            send_mail(str(name)+' || '+str(email),message, EMAIL_HOST_USER, ['noreply@libms.com'], fail_silently = False)
+            send_mail(str(name)+' || '+str(email),message, EMAIL_HOST_USER, ['noreplylibms@gmail.com'], fail_silently = False)
             return render(request, 'library/contactussuccess.html')
     return render(request, 'library/contactus.html', {'form':sub})
 
@@ -593,7 +736,7 @@ def deleteDuplicateBorrowers():
     #check all the books from bottom to top
     for rows in BorrowerObjects.reverse():
         #if we find a matching one when iterating from bottom to top
-        temp = models.Borrower.objects.filter(student=rows.student,book=rows.book).filter(status="Pending")
+        temp = models.Borrower.objects.filter(student=rows.student).filter(book=rows.book).filter(status="Pending")
         #remove the bottom one since we want the first instance of the Borrower object
         if temp.count()>1:
             rows.delete()
