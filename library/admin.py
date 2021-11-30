@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Book,StudentExtra,IssuedBook
+from .models import Book,StudentExtra, Borrower
 # Register your models here.
 class BookAdmin(admin.ModelAdmin):
     pass
@@ -11,6 +11,6 @@ class StudentExtraAdmin(admin.ModelAdmin):
 admin.site.register(StudentExtra, StudentExtraAdmin)
 
 
-class IssuedBookAdmin(admin.ModelAdmin):
+class BorrowerAdmin(admin.ModelAdmin):
     pass
-admin.site.register(IssuedBook, IssuedBookAdmin)
+admin.site.register(Borrower, BorrowerAdmin)

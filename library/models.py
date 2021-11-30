@@ -42,10 +42,11 @@ class Borrower(models.Model):
         return str(self.student.user)+" borrowed "+str(self.book)
 
     def dayMonthYearIssue(self):
-        return self.issue_date.strftime("%d/%m/%Y")
+        return self.issue_date.strftime("%d-%m-%Y")
     def dayMonthYearReturn(self):
-        return self.return_date.strftime("%d/%m/%Y")
-
+        return self.return_date.strftime("%d-%m-%Y")
+    def getreturnday(self):
+        return self.return_date
 
 
 
@@ -65,16 +66,3 @@ class Book(models.Model):
     Active=models.BooleanField(default = True)
     def __str__(self):
         return str(self.name)+"["+str(self.isbn)+']'
-
-
-
-class IssuedBook(models.Model):
-    #moved this in forms.py
-    #enrollment=[(student.enrollment,str(student.get_name)+' ['+str(student.enrollment)+']') for student in StudentExtra.objects.all()]
-    enrollment=models.CharField(max_length=30)
-    #isbn=[(str(book.isbn),book.name+' ['+str(book.isbn)+']') for book in Book.objects.all()]
-    isbn=models.CharField(max_length=30)
-    issuedate=models.DateField(auto_now=True)
-    expirydate=models.DateField(default=get_expiry)
-    def __str__(self):
-        return self.enrollment
