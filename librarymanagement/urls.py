@@ -66,4 +66,5 @@ urlpatterns = [
     path('searchbookrequests', views.searchbookrequests, name = "searchbookrequests"),
     path('searchstudent', views.searchstudent, name = "searchstudent"),
     path('searchbooksavailable', views.searchbooksavailable, name = "searchbooksavailable"),
+    path('todaycheckouthistory', views.todaycheckouthistory, name = "todaycheckouthistory"),
 ]

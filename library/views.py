@@ -180,7 +180,7 @@ def searchbooksadmin(request):
 
 
 def checkavailablebooks(books,studentID):
-    
+
     #iterate through books and if you find a book that has been "Issued" by another student
     #remove the book from the query
     for ib in books:
@@ -228,9 +228,16 @@ def booksAvailable_view(request):
             #exlude the book that has been ordered now
             books = books.exclude(id=obj.book.id)
 
-#return to html the query of books
-        return HttpResponseRedirect('BooksAvailable')
-    return render(request,'library/BooksAvailable.html',{'books':books})
+@login_required(login_url='adminlogin')
+@user_passes_test(is_admin)
+def todaycheckouthistory(request):
+
+    today = datetime.today()
+    ReturnersToday = models.Borrower.objects.filter(status = "Returned").filter(return_date__date = datetime(today.year,today.month,today.day))
+    print(today)
+    print(ReturnersToday)
+    return render(request, "library/todaycheckouthistory.html",{'li':ReturnersToday})
+
 
 '''
 @login_required(login_url='adminlogin')
@@ -617,6 +624,7 @@ def CloseToDeadline(request):
                     print(Selected)
                     Selected=Selected[0]
                     Selected.status = "Returned"
+                    Selected.return_date = datetime.today()
                     Selected.Fine = 0
                     Selected.save()
             return redirect('CloseToDeadline')
@@ -674,6 +682,7 @@ def userbooklog(request,username):
 
                 Selected=Selected[0]
                 Selected.status = "Returned"
+                Selected.return_date = datetime.today()
                 Selected.Fine = 0
                 Selected.save()
         return HttpResponseRedirect(username)
