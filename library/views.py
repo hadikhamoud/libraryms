@@ -71,6 +71,9 @@ def studentsignup_view(request):
         if form1.is_valid() and form2.is_valid():
             user=form1.save()
             user.set_password(user.password)
+            if User.objects.filter(username=self.cleaned_data['username']).exists():
+                return render(request,'library/PleaseVerify.html')
+
             #deactivate account until verified by user
             user.is_active=False
             user.save()
@@ -201,7 +204,7 @@ def checkavailablebooks(books,studentID):
 @login_required(login_url='studentlogin')
 def booksAvailable_view(request):
     #view to show the available books for student, first query all books
-    tempbooks = models.Book.objects.filter(Active = True).order_by('category')
+    tempbooks = models.Book.objects.filter(Active = True)
     books=checkavailablebooks(tempbooks,request.user.id)
 
     #get all the checkboxes that the student has submitted into id_list
@@ -227,6 +230,9 @@ def booksAvailable_view(request):
             print(obj.status)
             #exlude the book that has been ordered now
             books = books.exclude(id=obj.book.id)
+
+        return render(request,"library/BooksAvailable.html",{"books":books})
+    return render(request,"library/BooksAvailable.html",{"books":books})
 
 @login_required(login_url='adminlogin')
 @user_passes_test(is_admin)
@@ -402,12 +408,12 @@ def searchbooksavailable(request):
     if request.method == "POST":
             try:
                 searched = request.POST['searched']
-                Books = models.Book.objects.filter(name__contains = searched).filter(Active =True)
+                Books = models.Book.objects.filter(name__contains = searched).filter(Active =True).order_by('category')
                 print('contains',Books)
                 Books = checkavailablebooks(Books,request.user.id)
                 try:
-                    Booksbyisbn = models.Book.objects.filter(isbn__contains = int(searched)).filter(Active =True)
-                    Booksbyisbn = checkavailablebooks(Booksbyisbn,request.user.id)
+                    Booksbyisbn = models.Book.objects.filter(isbn__contains = int(searched)).filter(Active =True).order_by('category')
+                    Booksbyisbn = checkavailablebooks(Booksbyisbn,request.user.id).order_by('category')
                     print("byisbn",Booksbyisbn)
                 except:
                     Booksbyisbn = models.Book.objects.none()
@@ -441,6 +447,7 @@ def searchbooksavailable(request):
                 Books = Books.exclude(id=obj.book.id)
 
     #return to html the query of books
+
             return render(request, 'library/searchbooksavailable.html',{'books':Books})
     return render(request,'library/searchbooksavailable.html')
 
@@ -484,7 +491,6 @@ def ComingUp(request):
         #for each of his current books:
         #get the Borrower object
         print(ib)
-        books=models.Borrower.objects.filter(student=ib.student,book=ib.book)
         #check the return date
         return_date_days = ib.return_date.date()
         d = date.today()-return_date_days
@@ -492,24 +498,32 @@ def ComingUp(request):
         #if it is not coming up in 1 day or already expired, then forget it
         if int(d)<-1:
              continue
-        if len(books)>0:
-            #prepare to send info to frontend
-            t=(ib.student.user.username,ib.student.enrollment,ib.student.branch,ib.book.name,ib.book.author)
-            li1.append(t)
-            issdate=str(ib.issue_date.day)+'-'+str(ib.issue_date.month)+'-'+str(ib.issue_date.year)
-            expdate=str(ib.return_date.day)+'-'+str(ib.return_date.month)+'-'+str(ib.return_date.year)
-            #expdate=0
-        #fine calculation
-            print(ib.return_date)
-            timeTemp = date.today() - ib.return_date.date()
-            if int(timeTemp.days)>0:
-                ib.Fine = CalculateFine(ib.return_date.date())
-                ib.save()
 
-            fine = "$" + str(ib.Fine)
-            borrowerID = ib.id
-            t=(issdate,expdate,fine,borrowerID)
-            li2.append(t)
+            #prepare to send info to frontend
+        t=(ib.student.user.username,ib.student.enrollment,ib.student.branch,ib.book.name,ib.book.author)
+        li1.append(t)
+        issdate=str(ib.issue_date.day)+'-'+str(ib.issue_date.month)+'-'+str(ib.issue_date.year)
+        expdate=str(ib.return_date.day)+'-'+str(ib.return_date.month)+'-'+str(ib.return_date.year)
+        #expdate=0
+    #fine calculation
+        print(ib.return_date)
+        timeTemp = date.today() - ib.return_date.date()
+        if int(timeTemp.days)>0:
+            CalcFine = CalculateFine(ib.return_date.date())
+            if not ib.Renewed:
+                ib.Fine = CalcFine
+            else:
+                ib.Fined = CalcFine
+
+            TotalFine = ib.Fine + ib.Fined
+            if TotalFine > 15:
+                TotalFine = 15
+            ib.save()
+
+        fine = "$" + str(TotalFine)
+        borrowerID = ib.id
+        t=(issdate,expdate,fine,borrowerID)
+        li2.append(t)
 
     return render(request,'library/viewissuedbookbystudent.html',{'li1':li1,'li2':li2})
 
@@ -527,23 +541,31 @@ def viewissuedbookbystudent(request):
         books=models.Borrower.objects.filter(student=ib.student,book=ib.book)
         print(books)
 
-        if len(books)>0:
-            t=(ib.student.user.username,ib.student.enrollment,ib.student.branch,ib.book.name,ib.book.author)
-            li1.append(t)
-            issdate=str(ib.issue_date.day)+'-'+str(ib.issue_date.month)+'-'+str(ib.issue_date.year)
-            expdate=str(ib.return_date.day)+'-'+str(ib.return_date.month)+'-'+str(ib.return_date.year)
-            #expdate=0
-        #fine calculation
-            timeTemp = date.today() - ib.return_date.date()
-            if int(timeTemp.days)>0:
-                ib.Fine = CalculateFine(ib.return_date.date())
-                ib.save()
 
-            fine = "$" + str(ib.Fine)
-            borrowerID = ib.id
+        t=(ib.student.user.username,ib.student.enrollment,ib.student.branch,ib.book.name,ib.book.author)
+        li1.append(t)
+        issdate=str(ib.issue_date.day)+'-'+str(ib.issue_date.month)+'-'+str(ib.issue_date.year)
+        expdate=str(ib.return_date.day)+'-'+str(ib.return_date.month)+'-'+str(ib.return_date.year)
+        #expdate=0
+    #fine calculation
+        timeTemp = date.today() - ib.return_date.date()
+        if int(timeTemp.days)>0:
+            CalcFine = CalculateFine(ib.return_date.date())
+            if not ib.Renewed:
+                ib.Fine = CalcFine
+            else:
+                ib.Fined = CalcFine
 
-            t=(issdate,expdate,fine,borrowerID)
-            li2.append(t)
+            TotalFine = ib.Fine + ib.Fined
+            if TotalFine > 15:
+                TotalFine = 15
+            ib.save()
+
+        fine = "$" + str(TotalFine)
+        borrowerID = ib.id
+
+        t=(issdate,expdate,fine,borrowerID)
+        li2.append(t)
 
     return render(request,'library/viewissuedbookbystudent.html',{'li1':li1,'li2':li2})
 
@@ -561,10 +583,18 @@ def userhistory(request):
         print(ib.return_date)
         timeTemp = date.today() - ib.return_date.date()
         if int(timeTemp.days)>0:
-            ib.Fine = CalculateFine(ib.return_date.date())
+            CalcFine = CalculateFine(ib.return_date.date())
+            if not ib.Renewed:
+                ib.Fine = CalcFine
+            else:
+                ib.Fined = CalcFine
+
+            TotalFine = ib.Fine + ib.Fined
+            if TotalFine > 15:
+                TotalFine = 15
             ib.save()
 
-        fine = "$" + str(ib.Fine)
+        fine = "$" + str(TotalFine)
         borrowerID = ib.id
         Status = ib.status
         t=(issdate,expdate,fine,borrowerID,Status)
@@ -589,11 +619,6 @@ def CloseToDeadline(request):
     li1=[]
     li2=[]
     for ib in Borrowers:
-            print(ib)
-            books=models.Borrower.objects.filter(student=ib.student,book=ib.book)
-            print(books)
-
-            if len(books)>0:
                 t=(ib.student.user.username,ib.student.enrollment,ib.student.branch,ib.book.name,ib.book.author)
                 li1.append(t)
                 issdate=str(ib.issue_date.day)+'-'+str(ib.issue_date.month)+'-'+str(ib.issue_date.year)
@@ -603,10 +628,18 @@ def CloseToDeadline(request):
                 print(ib.return_date)
                 timeTemp = date.today() - ib.return_date.date()
                 if int(timeTemp.days)>0:
-                    ib.Fine = CalculateFine(ib.return_date.date())
+                    CalcFine = CalculateFine(ib.return_date.date())
+                    if not ib.Renewed:
+                        ib.Fine = CalcFine
+                    else:
+                        ib.Fined = CalcFine
+
+                    TotalFine = ib.Fine + ib.Fined
+                    if TotalFine > 15:
+                        TotalFine = 15
                     ib.save()
 
-                fine = "$" + str(ib.Fine)
+                fine = "$" + str(TotalFine)
                 borrowerID = ib.id
                 t=(issdate,expdate,fine,borrowerID)
                 li2.append(t)
@@ -647,11 +680,6 @@ def userbooklog(request,username):
         return render(request, 'library/userbooklog.html', {'li1':li1,'li2':li2})
 
     for ib in issuedbook:
-
-        books=models.Borrower.objects.filter(student=ib.student,book=ib.book)
-
-
-        if len(books)>0:
             t=(ib.student.user.username,ib.student.enrollment,ib.student.branch,ib.book.name,ib.book.author)
             li1.append(t)
             issdate=str(ib.issue_date.day)+'-'+str(ib.issue_date.month)+'-'+str(ib.issue_date.year)
@@ -660,10 +688,19 @@ def userbooklog(request,username):
 
             timeTemp = date.today() - ib.return_date.date()
             if int(timeTemp.days)>0:
-                ib.Fine = CalculateFine(ib.return_date.date())
+                CalcFine = CalculateFine(ib.return_date.date())
+                if not ib.Renewed:
+                    ib.Fine = CalcFine
+                else:
+                    ib.Fined = CalcFine
+
+                TotalFine = ib.Fine + ib.Fined
+                if TotalFine > 15:
+                    TotalFine = 15
+
                 ib.save()
 
-            fine = "$" + str(ib.Fine)
+            fine = "$" + str(TotalFine)
             BorrowerID = ib.id
             Status = ib.status
             t=(issdate,expdate,fine,BorrowerID,Status)
@@ -711,18 +748,13 @@ def RenewBook(request,borrowerID):
         if not BorrowedBook.Renewed:
             #renew the book if not renewed before and send True flag to alert
             #front end that the book has been renewed
-            BorrowedBook.return_date += timedelta(days = 30)
+            BorrowedBook.return_date += timedelta(days = 5)
             BorrowedBook.Renewed = True
             BorrowedBook.save()
             response.append(True)
         #else if response is empty, tell frontend that the book has already been renewed
         return render(request,'library/renewed.html',{'response': response,'navbar': navbar})
     return render(request,'library/RenewBook.html',{'li': BorrowedBook})
-
-
-
-
-
 
 
 
@@ -832,7 +864,7 @@ def CalculateFine(returndate):
     days=date.today() - returndate
     d=days
     fine=0
-    d=d.days
+    d=days.days
     if int(d)>0:
         fine=d*1
     if fine>15:
