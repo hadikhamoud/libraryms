@@ -1,18 +1,7 @@
-# Library Management
+# Library Management System using Django
 
 ---
-## screenshots
-### Homepage
-![homepage snap](https://github.com/sumitkumar1503/librarymanagement/blob/master/static/screenshots/homepage.png?raw=true)
-### Admin Dashboard
-![dashboard snap](https://github.com/sumitkumar1503/librarymanagement/blob/master/static/screenshots/adminhomepage.png?raw=true)
-### Available Book
-![invoice snap](https://github.com/sumitkumar1503/librarymanagement/blob/master/static/screenshots/availablebook.png?raw=true)
-### Issue Book
-![doctor snap](https://github.com/sumitkumar1503/librarymanagement/blob/master/static/screenshots/issuebook.png?raw=true)
-### Issued Book
-![doctor snap](https://github.com/sumitkumar1503/librarymanagement/blob/master/static/screenshots/bookissued.png?raw=true)
----
+
 ## Functions
 ### Admin
 - Create Admin account and Login.
@@ -28,7 +17,7 @@
 ---
 
 ## HOW TO RUN THIS PROJECT
-- Install Python(3.7.6) (Dont Forget to Tick Add to Path while installing Python)
+- Install Python (Dont Forget to Tick Add to Path while installing Python)
 - Open Terminal and Execute Following Commands :
 ```
 python -m pip install -r requirements. txt
@@ -55,8 +44,3 @@ EMAIL_RECEIVING_USER = 'youremail@gmail.com'
 
 ## Drawbacks/LoopHoles
 - Anyone can be Admin.
-
-## Feedback
-Any suggestion and feedback is welcome. You can message me on facebook
-- [Contact on Facebook](https://fb.com/sumit.luv)
-- [Subscribe my Channel LazyCoder On Youtube](https://youtube.com/lazycoders)
